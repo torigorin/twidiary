@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoneyLog — シンプル家計簿</title>
+<style>
+  :root {
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --pos:            #2a78d6;   /* 貯蓄プラス(青) */
+    --neg:            #e34948;   /* 貯蓄マイナス(赤) */
+    --good-text:      #006300;
+    --bad-text:       #d03b3b;
+    --accent:         #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --pos:            #3987e5;
+      --neg:            #e66767;
+      --good-text:      #0ca30c;
+      --bad-text:       #e66767;
+      --accent:         #3987e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 64px; }
+  header.app { display: flex; align-items: baseline; gap: 10px; padding: 12px 0 4px; }
+  header.app h1 { font-size: 20px; margin: 0; }
+  header.app .sub { color: var(--text-muted); font-size: 13px; }
+
+  section.card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  section.card > h2 { font-size: 15px; margin: 0 0 12px; color: var(--text-secondary); font-weight: 600; }
+
+  /* ---- stat tiles ---- */
+  .hero-label { font-size: 13px; color: var(--text-secondary); }
+  .hero-value { font-size: 40px; font-weight: 600; line-height: 1.2; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+  .tile { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .tile .label { font-size: 12px; color: var(--text-secondary); }
+  .tile .value { font-size: 18px; font-weight: 600; }
+  .tile .delta { font-size: 12px; }
+  .delta.up { color: var(--good-text); }
+  .delta.down { color: var(--bad-text); }
+
+  /* ---- chart ---- */
+  .chart-wrap { position: relative; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; }
+  .bar-hit { fill: transparent; cursor: default; }
+  .bar-hit:focus { outline: none; }
+  .bar-hit:focus + .bar-mark, .bar-hit:hover + .bar-mark { opacity: 0.8; }
+  .bar-mark { pointer-events: none; }
+  .tooltip {
+    position: absolute; pointer-events: none; display: none; z-index: 10;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    padding: 8px 10px; font-size: 12px; min-width: 130px;
+  }
+  .tooltip .tt-title { color: var(--text-secondary); margin-bottom: 4px; }
+  .tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; }
+  .tooltip .tt-row .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .tt-row .k { color: var(--text-secondary); }
+  .axis-text { font-size: 11px; fill: var(--text-muted); }
+  .bar-label { font-size: 11px; fill: var(--text-secondary); font-weight: 600; }
+
+  /* ---- table ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+  td { font-variant-numeric: tabular-nums; }
+  .toggle-btn {
+    background: none; border: none; color: var(--accent); cursor: pointer;
+    font-size: 13px; padding: 4px 0; font-family: inherit;
+  }
+
+  /* ---- forms ---- */
+  form.tx { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  form.tx .full { grid-column: 1 / -1; }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+  input, select, button {
+    font-family: inherit; font-size: 15px; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--baseline); border-radius: 8px;
+    padding: 8px 10px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+  .type-picker { display: flex; gap: 0; border: 1px solid var(--baseline); border-radius: 8px; overflow: hidden; }
+  .type-picker button {
+    flex: 1; border: none; border-radius: 0; background: none; cursor: pointer; padding: 8px 0;
+    color: var(--text-secondary);
+  }
+  .type-picker button.active { background: var(--accent); color: #fff; font-weight: 600; }
+  button.primary {
+    background: var(--accent); color: #fff; border: none; font-weight: 600; cursor: pointer; padding: 10px;
+  }
+  button.ghost { background: none; border: 1px solid var(--baseline); cursor: pointer; font-size: 13px; padding: 6px 10px; }
+  button.danger-text { background: none; border: none; color: var(--bad-text); cursor: pointer; font-size: 12px; padding: 2px 6px; }
+
+  /* ---- transaction list ---- */
+  .tx-list { list-style: none; margin: 0; padding: 0; }
+  .tx-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--grid); }
+  .tx-list .date { color: var(--text-muted); font-size: 12px; width: 4.5em; flex-shrink: 0; }
+  .tx-list .desc { flex: 1; min-width: 0; }
+  .tx-list .desc .cat { font-weight: 600; }
+  .tx-list .desc .meta { color: var(--text-muted); font-size: 12px; }
+  .tx-list .amt { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tx-list .amt.income { color: var(--good-text); }
+  .empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 16px 0; }
+
+  /* ---- accounts settings ---- */
+  .acct-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .acct-row input.name { flex: 2; min-width: 0; }
+  .acct-row input.init { flex: 1; min-width: 0; text-align: right; }
+  .settings-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .note { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .month-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .month-nav .cur { font-weight: 600; min-width: 7em; text-align: center; }
+  details.settings summary { cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: 600; }
+  .row-between { display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+<main>
+  <header class="app">
+    <h1>MoneyLog</h1>
+    <span class="sub">シンプル家計簿 — データはこの端末に保存されます</span>
+  </header>
+
+  <!-- 資産サマリー -->
+  <section class="card">
+    <div class="hero-label">総資産</div>
+    <div class="hero-value" id="totalAssets">¥0</div>
+    <div class="tiles" id="accountTiles"></div>
+  </section>
+
+  <!-- 今月の収支 -->
+  <section class="card">
+    <h2 id="thisMonthTitle">今月の収支</h2>
+    <div class="tiles" id="monthTiles" style="margin-top:0"></div>
+  </section>
+
+  <!-- 月別貯蓄チャート -->
+  <section class="card">
+    <div class="row-between">
+      <h2 style="margin:0">月別の貯蓄額(直近12ヶ月)</h2>
+      <button class="toggle-btn" id="chartTableToggle" type="button">表で見る</button>
+    </div>
+    <div class="chart-wrap" id="chartWrap" style="margin-top:8px">
+      <svg id="chartSvg" viewBox="0 0 728 260" role="img" aria-label="月別の貯蓄額の棒グラフ"></svg>
+      <div class="tooltip" id="chartTooltip"></div>
+    </div>
+    <div id="chartTable" style="display:none; margin-top:8px"></div>
+  </section>
+
+  <!-- 取引の追加 -->
+  <section class="card">
+    <h2>記録する</h2>
+    <form class="tx" id="txForm">
+      <div class="type-picker full" id="typePicker" role="radiogroup" aria-label="種類">
+        <button type="button" data-type="expense" class="active">支出</button>
+        <button type="button" data-type="income">収入</button>
+        <button type="button" data-type="transfer">振替</button>
+      </div>
+      <label class="field">日付
+        <input type="date" id="txDate" required>
+      </label>
+      <label class="field">金額(円)
+        <input type="number" id="txAmount" min="1" step="1" inputmode="numeric" placeholder="1000" required>
+      </label>
+      <label class="field" id="fieldAccount">口座
+        <select id="txAccount"></select>
+      </label>
+      <label class="field" id="fieldTo" style="display:none">振替先
+        <select id="txTo"></select>
+      </label>
+      <label class="field" id="fieldCategory">カテゴリ
+        <input type="text" id="txCategory" list="categoryList" placeholder="食費">
+        <datalist id="categoryList"></datalist>
+      </label>
+      <label class="field">メモ(任意)
+        <input type="text" id="txMemo" placeholder="">
+      </label>
+      <button type="submit" class="primary full">追加</button>
+    </form>
+  </section>
+
+  <!-- 履歴 -->
+  <section class="card">
+    <h2>履歴</h2>
+    <div class="month-nav">
+      <button class="ghost" type="button" id="prevMonth" aria-label="前の月">←</button>
+      <span class="cur" id="historyMonthLabel"></span>
+      <button class="ghost" type="button" id="nextMonth" aria-label="次の月">→</button>
+    </div>
+    <ul class="tx-list" id="txList"></ul>
+  </section>
+
+  <!-- 設定 -->
+  <section class="card">
+    <details class="settings">
+      <summary>口座とデータの管理</summary>
+      <div style="margin-top:12px">
+        <h2>口座(名前と開始残高)</h2>
+        <div id="acctRows"></div>
+        <div class="settings-actions">
+          <button class="ghost" type="button" id="addAccount">＋ 口座を追加</button>
+          <button class="primary" type="button" id="saveAccounts" style="padding:6px 14px">口座を保存</button>
+        </div>
+        <p class="note">開始残高 = アプリを使い始める時点での残高。以降の記録で自動計算されます。</p>
+        <h2 style="margin-top:16px">バックアップ</h2>
+        <div class="settings-actions">
+          <button class="ghost" type="button" id="exportBtn">エクスポート(JSON)</button>
+          <button class="ghost" type="button" id="importBtn">インポート</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none">
+        </div>
+        <p class="note">データはブラウザのlocalStorageのみに保存されます。機種変更や別ブラウザへの移行時はエクスポートしてください。</p>
+      </div>
+    </details>
+  </section>
+</main>
+
+<script>
+"use strict";
+/* ============ データ層 ============ */
+const STORE_KEY = "moneylog-data-v1";
+
+const DEFAULT_DATA = {
+  accounts: [
+    { id: "a-mizuho",  name: "みずほ銀行", initial: 0 },
+    { id: "a-rakuten", name: "楽天銀行",   initial: 0 },
+    { id: "a-cash",    name: "手持ち現金", initial: 0 },
+  ],
+  transactions: [], // {id, date:"YYYY-MM-DD", type:"income"|"expense"|"transfer", account, to?, category, amount, memo}
+};
+
+const CATEGORY_SUGGESTIONS = {
+  expense: ["食費","日用品","交通費","住居","水道光熱費","通信費","医療","交際費","趣味","衣服","その他"],
+  income:  ["給料","賞与","副収入","利息","その他"],
+};
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return structuredClone(DEFAULT_DATA);
+    const d = JSON.parse(raw);
+    if (!Array.isArray(d.accounts) || !Array.isArray(d.transactions)) throw new Error("bad shape");
+    return d;
+  } catch (e) {
+    console.warn("データの読み込みに失敗したため初期化します", e);
+    return structuredClone(DEFAULT_DATA);
+  }
+}
+function saveData() { localStorage.setItem(STORE_KEY, JSON.stringify(data)); }
+
+let data = loadData();
+let uiState = {
+  txType: "expense",
+  historyMonth: monthKey(new Date()),  // "YYYY-MM"
+  showChartTable: false,
+};
+
+/* ============ ユーティリティ ============ */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function monthKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+function monthKeyOf(dateStr) { return dateStr.slice(0, 7); }
+function fmtYen(n) {
+  const sign = n < 0 ? "-" : "";
+  return sign + "¥" + Math.abs(Math.round(n)).toLocaleString("ja-JP");
+}
+function fmtYenSigned(n) { return (n > 0 ? "+" : "") + fmtYen(n); }
+function fmtMonthLabel(key) {
+  const [y, m] = key.split("-");
+  return y + "年" + Number(m) + "月";
+}
+function shiftMonth(key, delta) {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return monthKey(d);
+}
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  }
+  for (const c of children) {
+    node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return node;
+}
+const SVG_NS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+}
+
+/* ============ 集計 ============ */
+function accountBalance(acctId) {
+  const acct = data.accounts.find(a => a.id === acctId);
+  let bal = acct ? Number(acct.initial) || 0 : 0;
+  for (const t of data.transactions) {
+    const amt = Number(t.amount) || 0;
+    if (t.type === "income"  && t.account === acctId) bal += amt;
+    if (t.type === "expense" && t.account === acctId) bal -= amt;
+    if (t.type === "transfer") {
+      if (t.account === acctId) bal -= amt;
+      if (t.to === acctId)      bal += amt;
+    }
+  }
+  return bal;
+}
+function monthlySummary(key) {
+  let income = 0, expense = 0;
+  for (const t of data.transactions) {
+    if (monthKeyOf(t.date) !== key) continue;
+    const amt = Number(t.amount) || 0;
+    if (t.type === "income")  income += amt;
+    if (t.type === "expense") expense += amt;
+  }
+  return { income, expense, net: income - expense };
+}
+function last12MonthKeys() {
+  const keys = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) keys.push(monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  return keys;
+}
+
+/* ============ 描画:サマリー ============ */
+function renderSummary() {
+  const total = data.accounts.reduce((s, a) => s + accountBalance(a.id), 0);
+  document.getElementById("totalAssets").textContent = fmtYen(total);
+
+  const tiles = document.getElementById("accountTiles");
+  tiles.replaceChildren();
+  for (const a of data.accounts) {
+    tiles.appendChild(el("div", { class: "tile" },
+      el("div", { class: "label" }, a.name),
+      el("div", { class: "value" }, fmtYen(accountBalance(a.id)))
+    ));
+  }
+
+  const cur = monthKey(new Date());
+  const prev = shiftMonth(cur, -1);
+  const s = monthlySummary(cur);
+  const sp = monthlySummary(prev);
+  document.getElementById("thisMonthTitle").textContent = fmtMonthLabel(cur) + "の収支";
+  const mt = document.getElementById("monthTiles");
+  mt.replaceChildren(
+    el("div", { class: "tile" },
+      el("div", { class: "label" }, "収入"),
+      el("div", { class: "value" }, fmtYen(s.income))),
+    el("div", { class: "tile" },
+      el("div", { class: "label" }, "支出"),
+      el("div", { class: "value" }, fmtYen(s.expense))),
+    el("div", { class: "tile" },
+      el("div", { class: "label" }, "貯蓄(収入−支出)"),
+      el("div", { class: "value" }, fmtYen(s.net)),
+      el("div", { class: "delta " + (s.net - sp.net >= 0 ? "up" : "down") },
+        "前月比 " + fmtYenSigned(s.net - sp.net)))
+  );
+}
+
+/* ============ 描画:チャート ============ */
+function niceStep(range, targetTicks) {
+  const raw = range / targetTicks;
+  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1))));
+  for (const m of [1, 2, 2.5, 5, 10]) if (raw <= m * pow) return m * pow;
+  return 10 * pow;
+}
+function fmtTick(v) {
+  if (v === 0) return "0";
+  if (Math.abs(v) >= 10000 && Math.abs(v) % 10000 === 0) return (v / 10000) + "万";
+  if (Math.abs(v) >= 10000) return (v / 10000).toLocaleString("ja-JP", { maximumFractionDigits: 1 }) + "万";
+  return v.toLocaleString("ja-JP");
+}
+
+function renderChart() {
+  const svg = document.getElementById("chartSvg");
+  const tooltip = document.getElementById("chartTooltip");
+  svg.replaceChildren();
+  tooltip.style.display = "none";
+
+  const keys = last12MonthKeys();
+  const rows = keys.map(k => ({ key: k, ...monthlySummary(k) }));
+
+  const W = 728, H = 260;
+  const padL = 52, padR = 12, padT = 16, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  let maxV = Math.max(0, ...rows.map(r => r.net));
+  let minV = Math.min(0, ...rows.map(r => r.net));
+  if (maxV === 0 && minV === 0) maxV = 10000; // 空のときの初期スケール
+  const step = niceStep(maxV - minV || 1, 4);
+  maxV = Math.ceil(maxV / step) * step;
+  minV = Math.floor(minV / step) * step;
+  const yOf = v => padT + (maxV - v) / (maxV - minV) * plotH;
+
+  // グリッド線と目盛り
+  for (let v = minV; v <= maxV; v += step) {
+    const y = yOf(v);
+    svg.appendChild(svgEl("line", {
+      x1: padL, x2: W - padR, y1: y, y2: y,
+      stroke: v === 0 ? "var(--baseline)" : "var(--grid)", "stroke-width": 1
+    }));
+    const t = svgEl("text", { x: padL - 6, y: y + 4, "text-anchor": "end", class: "axis-text" });
+    t.textContent = fmtTick(v);
+    svg.appendChild(t);
+  }
+
+  const band = plotW / rows.length;
+  const barW = Math.min(24, band - 8);
+  const r = Math.min(4, barW / 2);
+  const y0 = yOf(0);
+  const cssVars = getComputedStyle(document.documentElement);
+  const posColor = cssVars.getPropertyValue("--pos").trim();
+  const negColor = cssVars.getPropertyValue("--neg").trim();
+
+  rows.forEach((row, i) => {
+    const cx = padL + band * i + band / 2;
+    const x = cx - barW / 2;
+    const monthLabel = fmtMonthLabel(row.key);
+
+    // 棒(データ側の端のみ4px角丸、基準線側は直角)
+    if (row.net !== 0) {
+      const yTip = yOf(row.net);
+      const h = Math.abs(y0 - yTip);
+      const rr = Math.min(r, h);
+      let d;
+      if (row.net > 0) {
+        d = `M${x},${y0} L${x},${yTip + rr} Q${x},${yTip} ${x + rr},${yTip} L${x + barW - rr},${yTip} Q${x + barW},${yTip} ${x + barW},${yTip + rr} L${x + barW},${y0} Z`;
+      } else {
+        d = `M${x},${y0} L${x},${yTip - rr} Q${x},${yTip} ${x + rr},${yTip} L${x + barW - rr},${yTip} Q${x + barW},${yTip} ${x + barW},${yTip - rr} L${x + barW},${y0} Z`;
+      }
+      // ヒット領域を先に(hover/focusで隣接の.bar-markを持ち上げる)
+      const hit = svgEl("rect", {
+        x: padL + band * i, y: padT, width: band, height: plotH,
+        class: "bar-hit", tabindex: 0, role: "img",
+        "aria-label": `${monthLabel} 貯蓄 ${fmtYen(row.net)}`
+      });
+      const mark = svgEl("path", { d, fill: row.net > 0 ? posColor : negColor, class: "bar-mark" });
+      attachTooltip(hit, row, cx, yOf(row.net));
+      svg.appendChild(hit);
+      svg.appendChild(mark);
+    } else {
+      const hit = svgEl("rect", {
+        x: padL + band * i, y: padT, width: band, height: plotH,
+        class: "bar-hit", tabindex: 0, role: "img",
+        "aria-label": `${monthLabel} 貯蓄 ¥0`
+      });
+      attachTooltip(hit, row, cx, y0);
+      svg.appendChild(hit);
+    }
+
+    // X軸ラベル(月)— 偶数月だけ表示して混雑回避
+    const [yy, mm] = row.key.split("-").map(Number);
+    if (i % 2 === 1 || rows.length <= 6) {
+      const t = svgEl("text", { x: cx, y: H - 8, "text-anchor": "middle", class: "axis-text" });
+      t.textContent = (mm === 1 ? yy + "年" : "") + mm + "月";
+      svg.appendChild(t);
+    }
+  });
+
+  // 直近月にだけ値を直接ラベル(選択的ラベリング)
+  const lastIdx = rows.length - 1;
+  const last = rows[lastIdx];
+  if (last.net !== 0) {
+    const cx = padL + band * lastIdx + band / 2;
+    const yTip = yOf(last.net);
+    const t = svgEl("text", {
+      x: cx, y: last.net > 0 ? yTip - 6 : yTip + 14,
+      "text-anchor": "middle", class: "bar-label"
+    });
+    t.textContent = fmtYen(last.net);
+    svg.appendChild(t);
+  }
+
+  renderChartTable(rows);
+}
+
+function attachTooltip(hit, row, anchorX, anchorY) {
+  const tooltip = document.getElementById("chartTooltip");
+  const wrap = document.getElementById("chartWrap");
+  const svg = document.getElementById("chartSvg");
+  function show() {
+    tooltip.replaceChildren(
+      el("div", { class: "tt-title" }, fmtMonthLabel(row.key)),
+      ttRow("貯蓄", fmtYen(row.net)),
+      ttRow("収入", fmtYen(row.income)),
+      ttRow("支出", fmtYen(row.expense)),
+    );
+    tooltip.style.display = "block";
+    const scale = wrap.clientWidth / 728;
+    let left = anchorX * scale + 12;
+    const top = Math.max(0, anchorY * (svg.clientHeight / 260) - 20);
+    if (left + tooltip.offsetWidth > wrap.clientWidth) left = anchorX * scale - tooltip.offsetWidth - 12;
+    tooltip.style.left = left + "px";
+    tooltip.style.top = top + "px";
+  }
+  function hide() { tooltip.style.display = "none"; }
+  hit.addEventListener("pointerenter", show);
+  hit.addEventListener("pointerleave", hide);
+  hit.addEventListener("focus", show);
+  hit.addEventListener("blur", hide);
+}
+function ttRow(k, v) {
+  return el("div", { class: "tt-row" },
+    el("span", { class: "k" }, k),
+    el("span", { class: "v" }, v));
+}
+
+function renderChartTable(rows) {
+  const holder = document.getElementById("chartTable");
+  const table = el("table", {},
+    el("thead", {}, el("tr", {},
+      el("th", {}, "月"), el("th", {}, "収入"), el("th", {}, "支出"), el("th", {}, "貯蓄"))),
+    el("tbody", {}, ...rows.map(r => el("tr", {},
+      el("td", {}, fmtMonthLabel(r.key)),
+      el("td", {}, fmtYen(r.income)),
+      el("td", {}, fmtYen(r.expense)),
+      el("td", {}, fmtYen(r.net))))));
+  holder.replaceChildren(table);
+}
+
+/* ============ 描画:履歴 ============ */
+function renderHistory() {
+  document.getElementById("historyMonthLabel").textContent = fmtMonthLabel(uiState.historyMonth);
+  const list = document.getElementById("txList");
+  list.replaceChildren();
+  const acctName = id => (data.accounts.find(a => a.id === id) || { name: "(削除済み口座)" }).name;
+  const rows = data.transactions
+    .filter(t => monthKeyOf(t.date) === uiState.historyMonth)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+  if (rows.length === 0) {
+    list.appendChild(el("li", { class: "empty" }, "この月の記録はまだありません"));
+    return;
+  }
+  for (const t of rows) {
+    const amt = Number(t.amount) || 0;
+    let amtText, amtClass = "amt", desc;
+    if (t.type === "income")  { amtText = "+" + fmtYen(amt); amtClass += " income"; desc = t.category || "収入"; }
+    if (t.type === "expense") { amtText = "-" + fmtYen(amt); desc = t.category || "支出"; }
+    if (t.type === "transfer"){ amtText = fmtYen(amt); desc = "振替: " + acctName(t.account) + " → " + acctName(t.to); }
+    const meta = t.type === "transfer"
+      ? (t.memo || "")
+      : acctName(t.account) + (t.memo ? " ・ " + t.memo : "");
+    list.appendChild(el("li", {},
+      el("span", { class: "date" }, t.date.slice(5).replace("-", "/")),
+      el("div", { class: "desc" },
+        el("div", { class: "cat" }, desc),
+        el("div", { class: "meta" }, meta)),
+      el("span", { class: amtClass }, amtText),
+      el("button", { class: "danger-text", type: "button", "aria-label": "削除",
+        onclick: () => { if (confirm("この記録を削除しますか?")) { deleteTx(t.id); } } }, "削除")
+    ));
+  }
+}
+function deleteTx(id) {
+  data.transactions = data.transactions.filter(t => t.id !== id);
+  saveData();
+  renderAll();
+}
+
+/* ============ 描画:フォーム/設定 ============ */
+function renderAccountSelects() {
+  const sel = document.getElementById("txAccount");
+  const to = document.getElementById("txTo");
+  const keep = sel.value, keepTo = to.value;
+  sel.replaceChildren(...data.accounts.map(a => el("option", { value: a.id }, a.name)));
+  to.replaceChildren(...data.accounts.map(a => el("option", { value: a.id }, a.name)));
+  if (data.accounts.some(a => a.id === keep)) sel.value = keep;
+  if (data.accounts.some(a => a.id === keepTo)) to.value = keepTo;
+  else if (data.accounts.length > 1) to.value = data.accounts[1].id;
+}
+function renderCategoryList() {
+  const dl = document.getElementById("categoryList");
+  const suggestions = CATEGORY_SUGGESTIONS[uiState.txType] || [];
+  const used = [...new Set(data.transactions.filter(t => t.type === uiState.txType).map(t => t.category).filter(Boolean))];
+  dl.replaceChildren(...[...new Set([...used, ...suggestions])].map(c => el("option", { value: c })));
+}
+function renderAccountSettings() {
+  const holder = document.getElementById("acctRows");
+  holder.replaceChildren();
+  for (const a of data.accounts) {
+    holder.appendChild(el("div", { class: "acct-row", "data-id": a.id },
+      el("input", { class: "name", type: "text", value: a.name, "aria-label": "口座名" }),
+      el("input", { class: "init", type: "number", step: 1, value: a.initial, "aria-label": "開始残高" }),
+      el("button", { class: "danger-text", type: "button", onclick: (e) => {
+        const hasTx = data.transactions.some(t => t.account === a.id || t.to === a.id);
+        if (hasTx && !confirm(`「${a.name}」には記録があります。口座を削除すると関連する記録も削除されます。よろしいですか?`)) return;
+        data.accounts = data.accounts.filter(x => x.id !== a.id);
+        data.transactions = data.transactions.filter(t => t.account !== a.id && t.to !== a.id);
+        saveData();
+        renderAll();
+      } }, "削除")
+    ));
+  }
+}
+
+/* ============ イベント ============ */
+function setTxType(type) {
+  uiState.txType = type;
+  document.querySelectorAll("#typePicker button").forEach(b =>
+    b.classList.toggle("active", b.dataset.type === type));
+  document.getElementById("fieldTo").style.display = type === "transfer" ? "" : "none";
+  document.getElementById("fieldCategory").style.display = type === "transfer" ? "none" : "";
+  document.querySelector("#fieldAccount").firstChild.textContent = type === "transfer" ? "振替元" : "口座";
+  renderCategoryList();
+}
+
+document.getElementById("typePicker").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-type]");
+  if (btn) setTxType(btn.dataset.type);
+});
+
+document.getElementById("txForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const type = uiState.txType;
+  const account = document.getElementById("txAccount").value;
+  const to = document.getElementById("txTo").value;
+  const amount = Number(document.getElementById("txAmount").value);
+  const date = document.getElementById("txDate").value;
+  if (!date || !amount || amount <= 0) return;
+  if (type === "transfer" && account === to) { alert("振替元と振替先が同じです"); return; }
+  data.transactions.push({
+    id: uid(), date, type, account,
+    to: type === "transfer" ? to : undefined,
+    category: type === "transfer" ? "" : document.getElementById("txCategory").value.trim(),
+    amount,
+    memo: document.getElementById("txMemo").value.trim(),
+  });
+  saveData();
+  uiState.historyMonth = monthKeyOf(date);
+  document.getElementById("txAmount").value = "";
+  document.getElementById("txMemo").value = "";
+  renderAll();
+});
+
+document.getElementById("prevMonth").addEventListener("click", () => {
+  uiState.historyMonth = shiftMonth(uiState.historyMonth, -1); renderHistory();
+});
+document.getElementById("nextMonth").addEventListener("click", () => {
+  uiState.historyMonth = shiftMonth(uiState.historyMonth, 1); renderHistory();
+});
+
+document.getElementById("chartTableToggle").addEventListener("click", () => {
+  uiState.showChartTable = !uiState.showChartTable;
+  document.getElementById("chartTable").style.display = uiState.showChartTable ? "" : "none";
+  document.getElementById("chartWrap").style.display = uiState.showChartTable ? "none" : "";
+  document.getElementById("chartTableToggle").textContent = uiState.showChartTable ? "グラフで見る" : "表で見る";
+});
+
+document.getElementById("addAccount").addEventListener("click", () => {
+  data.accounts.push({ id: "a-" + uid(), name: "新しい口座", initial: 0 });
+  saveData();
+  renderAll();
+});
+document.getElementById("saveAccounts").addEventListener("click", () => {
+  document.querySelectorAll("#acctRows .acct-row").forEach(row => {
+    const a = data.accounts.find(x => x.id === row.dataset.id);
+    if (!a) return;
+    a.name = row.querySelector(".name").value.trim() || a.name;
+    a.initial = Number(row.querySelector(".init").value) || 0;
+  });
+  saveData();
+  renderAll();
+});
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "moneylog-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
+document.getElementById("importFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const d = JSON.parse(await file.text());
+    if (!Array.isArray(d.accounts) || !Array.isArray(d.transactions)) throw new Error("形式が正しくありません");
+    if (!confirm("現在のデータをインポート内容で置き換えます。よろしいですか?")) return;
+    data = d;
+    saveData();
+    renderAll();
+  } catch (err) {
+    alert("インポートに失敗しました: " + err.message);
+  } finally {
+    e.target.value = "";
+  }
+});
+
+/* ============ 初期化 ============ */
+function renderAll() {
+  renderSummary();
+  renderChart();
+  renderHistory();
+  renderAccountSelects();
+  renderCategoryList();
+  renderAccountSettings();
+}
+document.getElementById("txDate").value = new Date().toISOString().slice(0, 10);
+setTxType("expense");
+renderAll();
+window.addEventListener("resize", () => renderChart());
+</script>
+</body>
+</html>
