@@ -375,33 +375,67 @@ function getField(r){const t=r.tweet||r;return{text:t.full_text||t.text||'',date
 function cleanText(t){return t.replace(/\s*https:\/\/t\.co\/\w+\s*$/g,'').trim();}
 function monthKeyOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 
+// ─── IndexedDB (tweet.js本文の軽量キャッシュ。画像は含まない) ───
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    if(!window.indexedDB){rej(new Error('no idb'));return;}
+    const req=indexedDB.open('twidiaryDB',1);
+    req.onupgradeneeded=()=>{req.result.createObjectStore('kv');};
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  });
+}
+function idbGet(key){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const rq=db.transaction('kv','readonly').objectStore('kv').get(key);
+    rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);
+  })).catch(()=>undefined);
+}
+function idbSet(key,val){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(val,key);
+    tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);
+  })).catch(()=>{});
+}
+function idbDel(key){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction('kv','readwrite');tx.objectStore('kv').delete(key);
+    tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);
+  })).catch(()=>{});
+}
+
+function applyTweetRaw(raw,filename,opts){
+  try{
+    const{prefix,data}=parseArchiveFile(raw);
+    if(!Array.isArray(data)){if(!opts||!opts.silent)alert('配列形式が見つかりませんでした。');return false;}
+    S.prefix=prefix;S.filename=filename;
+    const existingIds=new Set(S.entries.filter(e=>!e.isCustom).map(e=>e.id));
+    const tweetEntries=[];
+    data.forEach(rawItem=>{
+      const f=getField(rawItem);const text=cleanText(f.text);if(!text)return;
+      const d=f.date?new Date(f.date):null;if(!d||isNaN(d.getTime()))return;
+      if(existingIds.has(f.id))return;
+      tweetEntries.push({raw:rawItem,text,dateObj:d,id:f.id,editText:text,rewrite:'',status:'pending'});
+    });
+    const customs=loadCustomEntries();
+    const allEntries=[...tweetEntries,...customs];
+    allEntries.sort((a,b)=>a.dateObj-b.dateObj);
+    buildIndex(allEntries);
+    S.moods=loadMoods();S.tweetEdits=loadTweetEdits();
+    allEntries.forEach(e=>{if(!e.isCustom&&S.tweetEdits[e.id]){const ed=S.tweetEdits[e.id];e.editText=ed.editText;e.rewrite=ed.rewrite;e.status=ed.status;}});
+    S.tab='diary';S.view='cover';
+    $('dropPanel').classList.add('hidden');
+    $('viewerPanel').classList.remove('hidden');
+    render();
+    return true;
+  }catch(err){if(!opts||!opts.silent)alert('読み込みエラー: '+err.message);return false;}
+}
 function loadFile(file){
   const reader=new FileReader();
   reader.onload=e=>{
-    try{
-      const{prefix,data}=parseArchiveFile(e.target.result);
-      if(!Array.isArray(data)){alert('配列形式が見つかりませんでした。');return;}
-      S.prefix=prefix;S.filename=file.name;
-      const existingIds=new Set(S.entries.filter(e=>!e.isCustom).map(e=>e.id));
-      const tweetEntries=[];
-      data.forEach(raw=>{
-        const f=getField(raw);const text=cleanText(f.text);if(!text)return;
-        const d=f.date?new Date(f.date):null;if(!d||isNaN(d.getTime()))return;
-        if(existingIds.has(f.id))return;
-        tweetEntries.push({raw,text,dateObj:d,id:f.id,editText:text,rewrite:'',status:'pending'});
-      });
-      const customs=loadCustomEntries();
-      const allEntries=[...tweetEntries,...customs];
-      allEntries.sort((a,b)=>a.dateObj-b.dateObj);
-      buildIndex(allEntries);
-      S.moods=loadMoods();S.tweetEdits=loadTweetEdits();
-      // Apply saved tweet edits
-      allEntries.forEach(e=>{if(!e.isCustom&&S.tweetEdits[e.id]){const ed=S.tweetEdits[e.id];e.editText=ed.editText;e.rewrite=ed.rewrite;e.status=ed.status;}});
-      S.tab='diary';S.view='cover';
-      $('dropPanel').classList.add('hidden');
-      $('viewerPanel').classList.remove('hidden');
-      render();
-    }catch(err){alert('読み込みエラー: '+err.message);}
+    const raw=e.target.result;
+    const ok=applyTweetRaw(raw,file.name);
+    if(ok) idbSet('tweetjs_cache',{filename:file.name,raw:raw});
   };
   reader.readAsText(file,'utf-8');
 }
@@ -681,11 +715,11 @@ function openSettings(){
   overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();S.settingsOpen=false;}});
   $('sBackupAll').onclick=()=>{downloadFile();setTimeout(exportBackup,400);};
   $('sDownload').onclick=downloadFile;
-  $('sReload').onclick=()=>{overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');$('fileInput').value='';};
+  $('sReload').onclick=()=>{overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');$('fileInput').value='';idbDel('tweetjs_cache');};
   $('addTweetsInput').addEventListener('change',e=>{if(e.target.files[0]){overlay.remove();S.settingsOpen=false;loadFile(e.target.files[0]);}});
   $('sExport').onclick=()=>{exportBackup();overlay.remove();S.settingsOpen=false;};
   $('importInput').addEventListener('change',e=>{if(e.target.files[0])importBackup(e.target.files[0],overlay);});
-  $('sReset').onclick=()=>{if(!confirm('すべてのデータ（手書き日記含む）をリセットしますか？'))return;localStorage.removeItem(CUSTOM_KEY);localStorage.removeItem(MOOD_KEY);S.entries=[];S.mediaByTweetId={};S.mediaCount=0;S.moods={};buildIndex([]);overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');};
+  $('sReset').onclick=()=>{if(!confirm('すべてのデータ（手書き日記含む）をリセットしますか？'))return;localStorage.removeItem(CUSTOM_KEY);localStorage.removeItem(MOOD_KEY);S.entries=[];S.mediaByTweetId={};S.mediaCount=0;S.moods={};buildIndex([]);idbDel('tweetjs_cache');overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');};
   $('sTrash').onclick=()=>{overlay.remove();S.settingsOpen=false;openTrash();};
   $('mediaFileInput').addEventListener('change',e=>{
     const files=Array.from(e.target.files||[]);let matched=0;
@@ -933,13 +967,18 @@ $('skipBtn').onclick=()=>{
   $('dropPanel').classList.add('hidden');$('viewerPanel').classList.remove('hidden');
   render();
 };
-(function(){
-  const customs=loadCustomEntries();
-  if(customs.length){
-    buildIndex(customs);S.moods=loadMoods();S.tweetEdits=loadTweetEdits();
-    S.tab='diary';S.view='cover';
-    $('dropPanel').classList.add('hidden');$('viewerPanel').classList.remove('hidden');
-    render();
+(async function(){
+  let restored=false;
+  const cached=await idbGet('tweetjs_cache');
+  if(cached&&cached.raw){restored=applyTweetRaw(cached.raw,cached.filename,{silent:true});}
+  if(!restored){
+    const customs=loadCustomEntries();
+    if(customs.length){
+      buildIndex(customs);S.moods=loadMoods();S.tweetEdits=loadTweetEdits();
+      S.tab='diary';S.view='cover';
+      $('dropPanel').classList.add('hidden');$('viewerPanel').classList.remove('hidden');
+      render();
+    }
   }
 })();
 
