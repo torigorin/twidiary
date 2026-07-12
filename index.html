@@ -521,7 +521,7 @@ function renderCalendar(mk){
 }
 
 function renderTimeline(mk,filterDay){
-  const idxs=S.byMonth[mk]||[];
+  const idxs=(S.byMonth[mk]||[]).filter(i=>S.entries[i].status!=='deleted');
   if(!idxs.length) return '<div class="empty-state">この月の記録はありません</div>';
   const byDay={};idxs.forEach(i=>{const d=S.entries[i].dateObj.getDate();(byDay[d]=byDay[d]||[]).push(i);});
   const sortedDays=Object.keys(byDay).map(Number).sort((a,b)=>S.sortAsc?a-b:b-a);
@@ -587,7 +587,7 @@ function renderSearch(){
   const term=S.searchTerm.trim().toLowerCase();
   if(!term) return html+'<div class="empty-state">検索キーワードを入力してください</div>';
   const matches=[];
-  S.entries.forEach((e,i)=>{if(e.text.toLowerCase().includes(term))matches.push(i);});
+  S.entries.forEach((e,i)=>{if(e.status!=='deleted'&&e.text.toLowerCase().includes(term))matches.push(i);});
   html+='<div class="search-stat">'+matches.length+'件ヒット</div>';
   if(!matches.length) return html+'<div class="empty-state">「'+esc(S.searchTerm)+'」に一致する記録はありません</div>';
   // Group by day for timeline display
@@ -612,6 +612,7 @@ function renderSearch(){
 function renderGallery(){
   const items=[];
   S.entries.forEach((e,i)=>{
+    if(e.status==='deleted') return;
     const media=S.mediaByTweetId[e.id]||[];
     media.forEach((m,mi)=>{
       if(!m.isVideo) items.push({url:m.url,date:e.dateObj,idx:i,mi});
@@ -630,7 +631,7 @@ function renderGallery(){
 // ─── Memories (n年前の今日) ───
 function renderMemories(){
   const today=new Date();const tm=today.getMonth(),td=today.getDate(),ty=today.getFullYear();
-  const mems=S.entries.filter(e=>e.dateObj.getMonth()===tm&&e.dateObj.getDate()===td&&e.dateObj.getFullYear()!==ty);
+  const mems=S.entries.filter(e=>e.status!=='deleted'&&e.dateObj.getMonth()===tm&&e.dateObj.getDate()===td&&e.dateObj.getFullYear()!==ty);
   if(!mems.length) return '';
   const collapsed=localStorage.getItem('journal-mem-collapsed')==='1';
   const byY={};mems.forEach(e=>{const y=e.dateObj.getFullYear();(byY[y]=byY[y]||[]).push(e);});
@@ -643,7 +644,7 @@ function renderMemories(){
       const mk=y+'-'+String(tm+1).padStart(2,'0');
       byY[y].slice(0,3).forEach((e,ei)=>{
         const mi=S.entries.indexOf(e);
-        h+='<div class="mem-entry" data-mem-month="'+mk+'" data-mem-day="'+td+'"><div class="mem-year">'+diff+'年前（'+y+'年）<span class="mem-jump">→ この月を見る</span><button class="e-act edit-btn mem-act" data-idx="'+mi+'" title="編集" style="display:inline-flex;width:24px;height:24px;vertical-align:middle;margin-left:4px">'+SVG.edit+'</button><button class="e-act del delete-btn mem-act" data-idx="'+mi+'" title="削除" style="display:inline-flex;width:24px;height:24px;vertical-align:middle">'+SVG.trash+'</button></div>'+(e.status==='deleted'?'<s style="opacity:.4">'+esc(e.text)+'</s>':esc(e.text))+'</div>';
+        h+='<div class="mem-entry" data-mem-month="'+mk+'" data-mem-day="'+td+'"><div class="mem-year">'+diff+'年前（'+y+'年）<span class="mem-jump">→ この月を見る</span><button class="e-act edit-btn mem-act" data-idx="'+mi+'" title="編集" style="display:inline-flex;width:24px;height:24px;vertical-align:middle;margin-left:4px">'+SVG.edit+'</button><button class="e-act del delete-btn mem-act" data-idx="'+mi+'" title="削除" style="display:inline-flex;width:24px;height:24px;vertical-align:middle">'+SVG.trash+'</button></div>'+esc(e.status==='applied'?e.rewrite:e.text)+'</div>';
       });
     });
   }
@@ -661,8 +662,9 @@ function openSettings(){
     '<div class="s-row" id="sImport" style="position:relative">'+SVG.folder+'<div><div class="s-label">バックアップから復元</div><div class="s-hint">JSONファイルを読み込み</div></div><input type="file" class="media-file-input" id="importInput" accept=".json"></div>'+
     '<div class="s-row" id="sAddTweets" style="position:relative">'+SVG.refresh+'<div class="s-label">tweet.js を追加読み込み</div><input type="file" class="media-file-input" id="addTweetsInput" accept=".js"></div>'+
     '<div class="s-row" id="sReload">'+SVG.refresh+'<div class="s-label">別のファイルで置き換え</div></div>'+
+    '<div class="s-row" id="sTrash">'+SVG.trash+'<div><div class="s-label">削除済み一覧</div><div class="s-hint">'+S.entries.filter(e=>e.status==='deleted').length+'件（復元できます）</div></div></div>'+
     '<div class="s-row" id="sReset" style="color:var(--danger)">'+SVG.trash+'<div class="s-label">すべてリセット</div></div>'+
-    '<div class="s-row"><div style="font-size:12px;color:var(--t3)">'+S.entries.length+' 件の記録 / 書き換え: '+S.entries.filter(e=>e.status==='applied').length+'件 / 削除予定: '+S.entries.filter(e=>e.status==='deleted').length+'件</div></div>'+
+    '<div class="s-row"><div style="font-size:12px;color:var(--t3)">'+S.entries.length+' 件の記録 / 書き換え: '+S.entries.filter(e=>e.status==='applied').length+'件 / 削除済み: '+S.entries.filter(e=>e.status==='deleted').length+'件</div></div>'+
   '</div>';
   document.body.appendChild(overlay);
   overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();S.settingsOpen=false;}});
@@ -672,6 +674,7 @@ function openSettings(){
   $('sExport').onclick=()=>{exportBackup();overlay.remove();S.settingsOpen=false;};
   $('importInput').addEventListener('change',e=>{if(e.target.files[0])importBackup(e.target.files[0],overlay);});
   $('sReset').onclick=()=>{if(!confirm('すべてのデータ（手書き日記含む）をリセットしますか？'))return;localStorage.removeItem(CUSTOM_KEY);localStorage.removeItem(MOOD_KEY);S.entries=[];S.mediaByTweetId={};S.mediaCount=0;S.moods={};buildIndex([]);overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');};
+  $('sTrash').onclick=()=>{overlay.remove();S.settingsOpen=false;openTrash();};
   $('mediaFileInput').addEventListener('change',e=>{
     const files=Array.from(e.target.files||[]);let matched=0;
     files.forEach(file=>{
@@ -684,6 +687,72 @@ function openSettings(){
     S.mediaCount+=matched;
     const hint=$('mediaHint');if(hint)hint.textContent=S.mediaCount+'枚読み込み済み';
     renderMain();
+  });
+}
+
+// ─── Trash (削除済み一覧) ───
+function permDeleteEntry(e){
+  const media=S.mediaByTweetId[e.id];
+  if(media){media.forEach(m=>{if(m.url&&m.url.indexOf('blob:')===0)URL.revokeObjectURL(m.url);});delete S.mediaByTweetId[e.id];}
+  S.entries=S.entries.filter(x=>x!==e);
+  if(e.isCustom){saveCustomEntries();}else{delete S.tweetEdits[e.id];saveTweetEdits();}
+  buildIndex(S.entries);
+}
+function emptyTrash(){
+  const toDelete=S.entries.filter(e=>e.status==='deleted');
+  toDelete.forEach(e=>permDeleteEntry(e));
+}
+function openTrash(){
+  const overlay=document.createElement('div');overlay.className='settings-overlay';overlay.id='trashOverlay';
+  const deleted=[];S.entries.forEach((e,i)=>{if(e.status==='deleted')deleted.push(i);});
+  let rows;
+  if(!deleted.length){
+    rows='<div class="empty-state">削除済みの記録はありません</div>';
+  }else{
+    rows='<div class="s-row" style="justify-content:flex-end;border-bottom:none;padding-bottom:8px">'+
+      '<button class="e-edit-btn secondary" id="emptyTrashBtn" style="color:var(--danger)">ゴミ箱を空にする（'+deleted.length+'件を完全削除）</button>'+
+    '</div>'+
+    deleted.map(i=>{
+      const e=S.entries[i];
+      const text=e.status==='applied'?e.rewrite:e.text;
+      const media=S.mediaByTweetId[e.id]||[];
+      const thumbs=media.length?'<div style="display:flex;gap:4px;margin-top:6px">'+media.slice(0,4).map(m=>m.isVideo?'':'<img src="'+esc(m.url)+'" style="width:40px;height:40px;object-fit:cover;border-radius:6px">').join('')+'</div>':'';
+      return '<div class="s-row" style="align-items:flex-start;gap:10px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:11px;color:var(--t3);margin-bottom:4px">'+fmtDateFull(e.dateObj)+'</div>'+
+          '<div style="font-size:14px;line-height:1.6;word-break:break-word">'+esc(text)+'</div>'+
+          thumbs+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'+
+          '<button class="e-edit-btn primary trash-restore-btn" data-idx="'+i+'">元に戻す</button>'+
+          '<button class="e-edit-btn secondary trash-perm-btn" data-idx="'+i+'" style="color:var(--danger)">完全に削除</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+  overlay.innerHTML='<div class="settings-sheet" style="max-height:80vh;overflow-y:auto"><div class="handle"></div><h3>削除済み一覧（'+deleted.length+'件）</h3>'+rows+'</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+  const emptyBtn=overlay.querySelector('#emptyTrashBtn');
+  if(emptyBtn)emptyBtn.onclick=()=>{
+    if(!confirm('削除済みの'+deleted.length+'件を完全に削除します。この操作は元に戻せません。よろしいですか？'))return;
+    emptyTrash();overlay.remove();renderMain();openTrash();
+  };
+  overlay.querySelectorAll('.trash-restore-btn').forEach(b=>{
+    b.onclick=()=>{
+      const idx=parseInt(b.dataset.idx,10);const ent=S.entries[idx];
+      ent.status='pending';
+      if(ent.isCustom){saveCustomEntries();}
+      else{delete S.tweetEdits[ent.id];saveTweetEdits();}
+      renderMain();overlay.remove();openTrash();
+    };
+  });
+  overlay.querySelectorAll('.trash-perm-btn').forEach(b=>{
+    b.onclick=()=>{
+      const idx=parseInt(b.dataset.idx,10);const ent=S.entries[idx];
+      if(!confirm('この記録を完全に削除します。この操作は元に戻せません。よろしいですか？'))return;
+      permDeleteEntry(ent);overlay.remove();renderMain();openTrash();
+    };
   });
 }
 
