@@ -241,7 +241,7 @@ input,textarea{font-family:var(--font);color:var(--text)}
   <div id="dropPanel" class="drop-panel">
     <div class="drop-card">
       <h1>twidiary<span>.</span></h1>
-      <div class="sub">つぶやきを、ただの記録として読み直す場所</div>
+      <div class="sub">過去の日記やつぶやきをまとめて読み直せる</div>
       <div class="dropzone" id="dropzone">
         <input type="file" id="fileInput" accept=".js,.txt,text/javascript,application/javascript,text/plain,*/*">
         <div class="icon">📂</div>
@@ -298,7 +298,7 @@ function saveCustomEntries(){
 }
 function resizeImage(file,maxW,cb){
   const reader=new FileReader();
-  reader.onload=ev=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>maxW){h=h*maxW/w;w=maxW;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',0.75));};img.src=ev.target.result;};
+  reader.onload=ev=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>maxW){h=h*maxW/w;w=maxW;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',0.65));};img.src=ev.target.result;};
   reader.readAsDataURL(file);
 }
 function openCompose(){
@@ -320,7 +320,7 @@ function openCompose(){
     c.querySelectorAll('.compose-img-remove').forEach(btn=>{btn.onclick=()=>{imgs.splice(parseInt(btn.dataset.ci),1);renderCI();};});
   }
   ov.querySelector('#compImgInput').addEventListener('change',e=>{
-    Array.from(e.target.files).forEach(f=>{resizeImage(f,1200,url=>{imgs.push(url);renderCI();});});
+    Array.from(e.target.files).forEach(f=>{resizeImage(f,1000,url=>{imgs.push(url);renderCI();});});
   });
   ov.querySelector('#compSave').onclick=()=>{
     const text=ov.querySelector('#compText').value.trim();
@@ -657,6 +657,7 @@ function openSettings(){
   const overlay=document.createElement('div');overlay.className='settings-overlay';overlay.id='settingsOverlay';
   overlay.innerHTML='<div class="settings-sheet"><div class="handle"></div><h3>設定</h3>'+
     '<div class="s-row" id="sMedia" style="position:relative">'+SVG.folder+'<div><div class="s-label">画像フォルダを読み込む</div><div class="s-hint" id="mediaHint">'+(S.mediaCount?S.mediaCount+'枚読み込み済み':'tweet_media フォルダを選択')+'</div></div><input type="file" class="media-file-input" id="mediaFileInput" webkitdirectory multiple></div>'+
+    '<div class="s-row" id="sBackupAll" style="background:var(--accent-bg);border-radius:var(--r-sm);border-bottom:none;margin-bottom:8px">'+SVG.download+'<div><div class="s-label">まとめてバックアップ（2ファイル）</div><div class="s-hint">tweet.js と 手書き日記JSON を続けて保存</div></div></div>'+
     '<div class="s-row" id="sDownload">'+SVG.download+'<div class="s-label">編集後のファイルをダウンロード</div></div>'+
     '<div class="s-row" id="sExport">'+SVG.download+'<div><div class="s-label">バックアップ（エクスポート）</div><div class="s-hint">手書き日記・気分マークをJSONで保存</div></div></div>'+
     '<div class="s-row" id="sImport" style="position:relative">'+SVG.folder+'<div><div class="s-label">バックアップから復元</div><div class="s-hint">JSONファイルを読み込み</div></div><input type="file" class="media-file-input" id="importInput" accept=".json"></div>'+
@@ -664,10 +665,21 @@ function openSettings(){
     '<div class="s-row" id="sReload">'+SVG.refresh+'<div class="s-label">別のファイルで置き換え</div></div>'+
     '<div class="s-row" id="sTrash">'+SVG.trash+'<div><div class="s-label">削除済み一覧</div><div class="s-hint">'+S.entries.filter(e=>e.status==='deleted').length+'件（復元できます）</div></div></div>'+
     '<div class="s-row" id="sReset" style="color:var(--danger)">'+SVG.trash+'<div class="s-label">すべてリセット</div></div>'+
+    '<div style="font-size:11px;color:var(--t3);line-height:1.7;padding:12px 4px 4px;border-top:1px solid var(--border);margin-top:8px">'+
+      '<b style="color:var(--t2)">📝 バックアップが2つに分かれている理由</b><br>'+
+      'tweet.js は「元のツイートのデータ形式」に沿ったファイルのため、この形式のまま手書き日記を混ぜることができません（次回読み込み時に壊れる原因になります）。そのため、以下の2つを別々に保存する仕様にしています。<br><br>'+
+      '① <b>tweet.js（編集後のファイルをダウンロード）</b>：元ツイートの編集・削除を反映したもの。元のtweet.jsに上書き保存してください。<br>'+
+      '② <b>バックアップJSON（エクスポート）</b>：手書きで追加した日記・画像・気分マークをまとめたもの。<br><br>'+
+      '<b style="color:var(--t2)">安全なバックアップ手順</b><br>'+
+      '1. 「まとめてバックアップ」で2ファイルをまとめてダウンロード<br>'+
+      '2. ①は元のtweet.jsに上書き、②はiCloud等どこかのフォルダに保管<br>'+
+      '3. 機種変更やSafariのデータ消去の前、または大きく編集した後に実施推奨'+
+    '</div>'+
     '<div class="s-row"><div style="font-size:12px;color:var(--t3)">'+S.entries.length+' 件の記録 / 書き換え: '+S.entries.filter(e=>e.status==='applied').length+'件 / 削除済み: '+S.entries.filter(e=>e.status==='deleted').length+'件</div></div>'+
   '</div>';
   document.body.appendChild(overlay);
   overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();S.settingsOpen=false;}});
+  $('sBackupAll').onclick=()=>{downloadFile();setTimeout(exportBackup,400);};
   $('sDownload').onclick=downloadFile;
   $('sReload').onclick=()=>{overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');$('fileInput').value='';};
   $('addTweetsInput').addEventListener('change',e=>{if(e.target.files[0]){overlay.remove();S.settingsOpen=false;loadFile(e.target.files[0]);}});
