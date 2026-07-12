@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>twidiary.</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font-d: 'Outfit', sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --bg: #F5F3ED;
+  --card: #FFFFFF;
+  --text: #1C1B18;
+  --t2: #6B6760;
+  --t3: #A8A39A;
+  --t4: #D0CCC4;
+  --accent: #4A7A6A;
+  --accent-bg: rgba(74,122,106,0.08);
+  --danger: #C0473A;
+  --border: #E8E4DC;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  --r: 16px;
+  --r-sm: 10px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{height:100%;-webkit-text-size-adjust:100%}
+body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overflow:hidden}
+::selection{background:var(--accent-bg)}
+button{font-family:var(--font);cursor:pointer;border:none;background:none;color:inherit}
+input,textarea{font-family:var(--font);color:var(--text)}
+
+#app{height:100%;display:flex;flex-direction:column}
+
+/* ─── Drop Panel ─── */
+.drop-panel{flex:1;display:flex;align-items:center;justify-content:center;padding:32px 24px}
+.drop-card{width:100%;max-width:400px;text-align:center}
+.drop-card h1{font-family:var(--font-d);font-weight:800;font-size:48px;letter-spacing:-0.02em;color:var(--text);margin-bottom:4px}
+.drop-card h1 span{color:var(--accent)}
+.drop-card .sub{color:var(--t3);font-size:13px;margin-bottom:36px}
+.dropzone{background:var(--card);border:2px dashed var(--t4);border-radius:var(--r);padding:44px 20px;cursor:pointer;transition:border-color .15s,background .15s}
+.dropzone:hover,.dropzone.drag{border-color:var(--accent);background:var(--accent-bg)}
+.dropzone input{display:none}
+.dropzone .icon{font-size:32px;margin-bottom:10px;opacity:.5}
+.dropzone .label{font-weight:600;font-size:16px;margin-bottom:4px}
+.dropzone .hint{font-size:12px;color:var(--t3)}
+.privacy{color:var(--t3);font-size:11px;margin-top:24px;line-height:1.7}
+.privacy b{color:var(--t2)}
+
+/* ─── Viewer Shell ─── */
+.viewer{flex:1;display:flex;flex-direction:column;height:100%}
+.header{padding:14px 20px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;background:var(--bg);z-index:10}
+.header .h-title{font-family:var(--font-d);font-weight:700;font-size:20px;letter-spacing:-0.01em}
+.header .h-title span{color:var(--accent)}
+.h-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:background .12s}
+.h-btn:hover,.h-btn:active{background:var(--accent-bg)}
+.h-btn svg{width:20px;height:20px;stroke:var(--text);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.h-group{display:flex;gap:4px;align-items:center}
+
+.main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(68px + var(--safe-b))}
+
+/* ─── Bottom Nav ─── */
+.bnav{display:flex;background:var(--card);border-top:1px solid var(--border);padding:6px 0 calc(6px + var(--safe-b));flex-shrink:0;position:relative;z-index:10}
+.bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:10px;color:var(--t3);letter-spacing:.02em;transition:color .12s}
+.bnav button.active{color:var(--accent)}
+.bnav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ─── Cover (Year/Month Index) ─── */
+.cover-section{padding:24px 20px 20px}
+.year-head{font-family:var(--font-d);font-weight:800;font-size:36px;color:var(--text);margin-bottom:4px;display:flex;align-items:baseline;gap:10px}
+.year-head .cnt{font-family:var(--font);font-weight:400;font-size:12px;color:var(--t3)}
+.month-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.m-card{background:var(--card);border-radius:var(--r-sm);padding:16px 12px;box-shadow:var(--shadow);cursor:pointer;transition:transform .12s,box-shadow .12s;display:flex;flex-direction:column;gap:4px}
+.m-card:active{transform:scale(0.97)}
+.m-card.empty{opacity:.3;cursor:default;box-shadow:none;background:transparent}
+.m-card.empty:active{transform:none}
+.m-card .m-name{font-family:var(--font-d);font-weight:700;font-size:20px}
+.m-card .m-sub{font-size:11px;color:var(--t3)}
+.m-card .m-dots{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap}
+.m-card .m-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:.4}
+
+/* ─── Month Header ─── */
+.month-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px}
+.month-label{text-align:center}
+.month-label .ml-num{font-family:var(--font-d);font-weight:800;font-size:32px;line-height:1}
+.month-label .ml-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.month-nav{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:background .12s}
+.month-nav:active{background:var(--accent-bg)}
+.month-nav.disabled{opacity:.2;pointer-events:none}
+.month-nav svg{width:20px;height:20px;stroke:var(--text);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ─── Calendar Grid ─── */
+.cal-wrap{padding:4px 16px 12px}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;color:var(--t3);margin-bottom:6px;font-weight:500}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-cell{height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-family:var(--font-d);font-size:13px;font-weight:500;color:var(--t3);position:relative;cursor:default;transition:background .12s}
+.cal-cell.has{color:var(--text);cursor:pointer;font-weight:600}
+.cal-cell.has:active{background:var(--accent-bg)}
+.cal-cell.today{background:var(--accent-bg)}
+.cal-cell.hl{background:var(--accent);color:#fff;border-radius:var(--r-sm)}
+.cal-cell.hl .cal-dot{background:#fff}
+.cal-dot{width:4px;height:4px;border-radius:50%;background:var(--accent);position:absolute;bottom:4px}
+.cal-divider{height:1px;background:var(--border);margin:0 20px}
+
+/* ─── Timeline ─── */
+.timeline{padding:8px 0 40px}
+.day-group{display:flex;gap:0;padding:0 16px;margin-bottom:0}
+.day-marker{width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:18px;position:relative}
+.day-marker::after{content:'';position:absolute;top:58px;bottom:0;left:50%;width:1px;background:var(--border)}
+.day-group:last-child .day-marker::after{display:none}
+.day-num{font-family:var(--font-d);font-weight:700;font-size:28px;line-height:1;color:var(--accent)}
+.day-name{font-size:11px;color:var(--t3);margin-top:2px;font-weight:500}
+.day-content{flex:1;min-width:0;padding:10px 0 6px}
+
+.e-card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);margin-bottom:10px;position:relative}
+.e-card.deleted{opacity:.35}
+.e-time{font-size:11px;color:var(--t3);margin-bottom:6px;font-weight:500;letter-spacing:.03em}
+.e-text{font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.e-text mark{background:var(--accent-bg);color:var(--accent);font-weight:600;padding:0 2px;border-radius:2px}
+
+.e-media{display:grid;gap:4px;margin-top:12px;border-radius:var(--r-sm);overflow:hidden}
+.e-media.m1{grid-template-columns:1fr}
+.e-media.m2{grid-template-columns:1fr 1fr}
+.e-media.m3{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}
+.e-media.m3 .e-img:first-child{grid-row:1/3}
+.e-media.m4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.e-img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;cursor:zoom-in;background:var(--bg)}
+.e-media.m1 .e-img{aspect-ratio:16/10;border-radius:var(--r-sm)}
+.e-video-placeholder{width:100%;aspect-ratio:4/3;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer}
+
+.e-foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px;gap:8px}
+.e-actions{display:flex;gap:6px;flex-shrink:0}
+.e-act{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--t3);transition:background .12s,color .12s;font-size:14px}
+.e-act:active{background:var(--accent-bg)}
+.e-act.del:active{background:rgba(192,71,58,.08);color:var(--danger)}
+.e-act svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.e-edit-area{width:100%;font-family:var(--font);font-size:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;min-height:80px;resize:vertical;line-height:1.65;margin-top:8px}
+.e-edit-area:focus{outline:none;border-color:var(--accent)}
+.e-edit-actions{display:flex;gap:8px;margin-top:8px;justify-content:flex-end}
+.e-edit-btn{font-size:13px;padding:8px 16px;border-radius:20px;font-weight:500}
+.e-edit-btn.primary{background:var(--accent);color:#fff}
+.e-edit-btn.secondary{background:var(--bg);color:var(--t2)}
+.e-status{font-size:11px;color:var(--t3);display:flex;align-items:center;gap:6px}
+.e-status button{font-size:11px;color:var(--accent);text-decoration:underline}
+
+/* ─── Mood ─── */
+.mood-row{display:flex;align-items:center;gap:4px}
+.mood-label{font-size:10px;color:var(--t4);margin-right:2px;letter-spacing:.05em}
+.mood-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;color:var(--t4);transition:all .12s}
+.mood-btn:active,.mood-btn.on{color:var(--mc)}
+.mood-btn.on{background:color-mix(in srgb, var(--mc) 12%, transparent);transform:scale(1.1)}
+
+/* ─── Search ─── */
+.search-bar{padding:10px 20px;position:sticky;top:0;background:var(--bg);z-index:5}
+.search-input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:10px 16px;font-size:14px;transition:border-color .15s}
+.search-input:focus{outline:none;border-color:var(--accent)}
+.search-stat{text-align:center;font-size:12px;color:var(--t3);padding:8px}
+.search-results{padding:0 4px}
+.search-results .day-group{padding:0 12px}
+
+/* ─── Gallery ─── */
+.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:4px}
+.gallery-item{aspect-ratio:1;position:relative;cursor:zoom-in;overflow:hidden}
+.gallery-item img{width:100%;height:100%;object-fit:cover;display:block}
+.gallery-item .g-date{position:absolute;bottom:0;left:0;right:0;padding:4px 6px;background:linear-gradient(transparent,rgba(0,0,0,.5));color:#fff;font-size:9px;font-weight:500;letter-spacing:.03em}
+.gallery-empty{text-align:center;padding:60px 20px;color:var(--t3);font-size:13px}
+
+/* ─── Settings Panel ─── */
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.settings-sheet{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:20px 20px calc(20px + var(--safe-b));max-height:70vh}
+.settings-sheet .handle{width:36px;height:4px;background:var(--t4);border-radius:2px;margin:0 auto 20px}
+.settings-sheet h3{font-family:var(--font-d);font-weight:700;font-size:18px;margin-bottom:16px}
+.s-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);font-size:14px;cursor:pointer}
+.s-row:last-child{border-bottom:none}
+.s-row svg{width:20px;height:20px;stroke:var(--t2);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.s-row .s-label{flex:1}
+.s-row .s-hint{font-size:12px;color:var(--t3)}
+.media-file-input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* ─── Lightbox ─── */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+.lightbox img,.lightbox video{max-width:100%;max-height:100%;border-radius:4px}
+.lb-close{position:absolute;top:16px;right:16px;color:#fff;opacity:.6;font-size:13px}
+
+/* ─── Memories Banner ─── */
+.memories{padding:12px 20px}
+.mem-card{background:var(--accent-bg);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:8px}
+.mem-title{font-family:var(--font-d);font-weight:600;font-size:14px;color:var(--accent)}
+.mem-entry{font-size:13px;color:var(--t2);border-left:2px solid var(--accent);padding-left:10px;margin-top:4px}
+.mem-year{font-size:11px;color:var(--t3);margin-bottom:2px}
+
+.empty-state{text-align:center;padding:60px 24px;color:var(--t3);font-size:13px}
+.hidden{display:none!important}
+
+/* Memories toggle */
+.mem-header{display:flex;align-items:center;justify-content:space-between}
+.mem-toggle{font-size:12px;color:var(--accent);padding:4px 10px;border-radius:12px;background:var(--accent-bg)}
+.mem-toggle:active{opacity:.7}
+.mem-entry{cursor:pointer;transition:background .12s;border-radius:8px;padding:8px 10px;margin:4px -10px 0}
+.mem-entry:active{background:rgba(0,0,0,.04)}
+.mem-jump{font-size:10px;color:var(--accent);margin-left:6px}
+
+/* FAB */
+.fab{position:fixed;bottom:calc(76px + var(--safe-b));right:20px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:15;font-size:28px;line-height:1;transition:transform .12s}
+.fab:active{transform:scale(.92)}
+.fab svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round}
+
+/* Compose */
+.compose-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.compose-sheet{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:20px 20px calc(20px + var(--safe-b));max-height:85vh;overflow-y:auto}
+.compose-sheet .handle{width:36px;height:4px;background:var(--t4);border-radius:2px;margin:0 auto 16px}
+.compose-sheet h3{font-family:var(--font-d);font-weight:700;font-size:18px;margin-bottom:16px}
+.compose-row{margin-bottom:14px}
+.compose-row label{display:block;font-size:12px;color:var(--t2);margin-bottom:6px;font-weight:500}
+.compose-date-row{display:flex;gap:10px}
+.compose-date-row input{font-family:var(--font);font-size:14px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg)}
+.compose-date-row input:focus{outline:none;border-color:var(--accent)}
+.compose-textarea{width:100%;min-height:120px;font-family:var(--font);font-size:14px;padding:12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg);resize:vertical;line-height:1.65}
+.compose-textarea:focus{outline:none;border-color:var(--accent)}
+.compose-imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.compose-img-wrap{position:relative;display:inline-block}
+.compose-img-thumb{width:72px;height:72px;border-radius:8px;object-fit:cover;display:block}
+.compose-img-remove{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1}
+.compose-foot{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:16px}
+.compose-img-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2);padding:8px 14px;border-radius:20px;background:var(--bg);position:relative}
+.compose-img-btn:active{background:var(--border)}
+.compose-img-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.compose-save{font-size:14px;padding:10px 24px;border-radius:24px;background:var(--accent);color:#fff;font-weight:600}
+.compose-save:active{opacity:.85}
+.e-custom-badge{display:inline-block;font-size:9px;color:var(--accent);background:var(--accent-bg);padding:1px 6px;border-radius:8px;margin-left:8px;vertical-align:middle;letter-spacing:.03em}
+.skip-link{display:block;margin-top:20px;font-size:13px;color:var(--accent);cursor:pointer;background:none;border:none;font-family:var(--font)}
+.skip-link:active{opacity:.7}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="dropPanel" class="drop-panel">
+    <div class="drop-card">
+      <h1>twidiary<span>.</span></h1>
+      <div class="sub">つぶやきを、ただの記録として読み直す場所</div>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept=".js">
+        <div class="icon">📂</div>
+        <div class="label">ファイルを選ぶ</div>
+        <div class="hint">tweet.js をタップまたはドラッグ</div>
+      </div>
+      <p class="privacy"><b>すべてこのブラウザの中だけで処理されます。</b><br>ファイルはどこにも送信されません。</p>
+      <button class="skip-link" id="skipBtn">tweet.js なしで日記だけ始める</button>
+    </div>
+  </div>
+
+  <div id="viewerPanel" class="viewer hidden">
+    <header class="header" id="header"></header>
+    <main class="main" id="main"></main>
+    <button class="fab" id="fabBtn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    <nav class="bnav" id="bnav"></nav>
+  </div>
+</div>
+<div class="lightbox hidden" id="lightbox"><span class="lb-close">✕ 閉じる</span><div id="lbContent"></div></div>
+
+<script>
+(function(){
+const MOODS=[
+  {key:'great',mark:'◎',label:'とても良い',color:'#2a7a55'},
+  {key:'good',mark:'○',label:'良い',color:'#3f7a8c'},
+  {key:'flat',mark:'△',label:'ふつう',color:'#8a8578'},
+  {key:'low',mark:'▽',label:'低調',color:'#a8791f'},
+  {key:'hard',mark:'✕',label:'しんどい',color:'#b5473c'},
+];
+const MOOD_KEY='journal-moods-v1';
+const ML=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const DAYS=['日','月','火','水','木','金','土'];
+
+function loadMoods(){try{return JSON.parse(localStorage.getItem(MOOD_KEY))||{};}catch(e){return{};}}
+function saveMoods(){try{localStorage.setItem(MOOD_KEY,JSON.stringify(S.moods));}catch(e){}}
+
+const CUSTOM_KEY='journal-custom-v1';
+const TWEET_EDITS_KEY='journal-tweet-edits-v1';
+function loadTweetEdits(){try{return JSON.parse(localStorage.getItem(TWEET_EDITS_KEY))||{};}catch(e){return{};}}
+function saveTweetEdits(){try{localStorage.setItem(TWEET_EDITS_KEY,JSON.stringify(S.tweetEdits));}catch(e){}}
+function loadCustomEntries(){
+  try{
+    const arr=JSON.parse(localStorage.getItem(CUSTOM_KEY))||[];
+    return arr.map(c=>{
+      const entry={id:c.id,text:c.text,dateObj:new Date(c.date),editText:c.editText||c.text,rewrite:c.rewrite||'',status:c.status||'pending',isCustom:true,customImages:c.images||[],raw:null};
+      if(entry.customImages.length){S.mediaByTweetId[entry.id]=entry.customImages.map(url=>({url,isVideo:false,name:'custom'}));}
+      return entry;
+    });
+  }catch(e){return[];}
+}
+function saveCustomEntries(){
+  const customs=S.entries.filter(e=>e.isCustom).map(e=>({id:e.id,text:e.text,date:e.dateObj.toISOString(),editText:e.editText,rewrite:e.rewrite,status:e.status,images:e.customImages||[]}));
+  try{localStorage.setItem(CUSTOM_KEY,JSON.stringify(customs));}catch(e){}
+}
+function resizeImage(file,maxW,cb){
+  const reader=new FileReader();
+  reader.onload=ev=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>maxW){h=h*maxW/w;w=maxW;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',0.75));};img.src=ev.target.result;};
+  reader.readAsDataURL(file);
+}
+function openCompose(){
+  const now=new Date();
+  const ds=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const ts=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  let imgs=[];
+  const ov=document.createElement('div');ov.className='compose-overlay';ov.id='composeOverlay';
+  ov.innerHTML='<div class="compose-sheet"><div class="handle"></div><h3>新しい日記</h3>'+
+    '<div class="compose-row"><label>日付・時間</label><div class="compose-date-row"><input type="date" id="compDate" value="'+ds+'"><input type="time" id="compTime" value="'+ts+'"></div></div>'+
+    '<div class="compose-row"><label>内容</label><textarea class="compose-textarea" id="compText" placeholder="今日のこと..."></textarea></div>'+
+    '<div class="compose-row"><div class="compose-imgs" id="compImgs"></div></div>'+
+    '<div class="compose-foot"><label class="compose-img-btn">'+SVG.image+' 画像<input type="file" accept="image/*" multiple id="compImgInput"></label><button class="compose-save" id="compSave">保存</button></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  function renderCI(){
+    const c=ov.querySelector('#compImgs');
+    c.innerHTML=imgs.map((url,i)=>'<div class="compose-img-wrap"><img class="compose-img-thumb" src="'+url+'"><div class="compose-img-remove" data-ci="'+i+'">\u2715</div></div>').join('');
+    c.querySelectorAll('.compose-img-remove').forEach(btn=>{btn.onclick=()=>{imgs.splice(parseInt(btn.dataset.ci),1);renderCI();};});
+  }
+  ov.querySelector('#compImgInput').addEventListener('change',e=>{
+    Array.from(e.target.files).forEach(f=>{resizeImage(f,1200,url=>{imgs.push(url);renderCI();});});
+  });
+  ov.querySelector('#compSave').onclick=()=>{
+    const text=ov.querySelector('#compText').value.trim();
+    if(!text){alert('内容を入力してください');return;}
+    const d=ov.querySelector('#compDate').value,t=ov.querySelector('#compTime').value;
+    const dateObj=new Date(d+'T'+t+':00');
+    const entry={id:'custom-'+Date.now(),text:text,dateObj:dateObj,editText:text,rewrite:'',status:'pending',isCustom:true,customImages:imgs,raw:null};
+    if(imgs.length){S.mediaByTweetId[entry.id]=imgs.map(url=>({url,isVideo:false,name:'custom'}));}
+    S.entries.push(entry);S.entries.sort((a,b)=>a.dateObj-b.dateObj);
+    saveCustomEntries();buildIndex(S.entries);
+    S.currentMonth=monthKeyOf(dateObj);S.calHL=dateObj.getDate();S.tab='diary';S.view='month';
+    ov.remove();render();
+  };
+}
+
+const S={
+  entries:[],monthKeys:[],byMonth:{},byYear:{},years:[],
+  tab:'diary', // diary|search|gallery
+  view:'cover', // cover|month
+  currentMonth:null,searchTerm:'',
+  openEdit:new Set(),moods:{},
+  mediaByTweetId:{},mediaCount:0,
+  prefix:'',suffix:';',filename:'data.js',
+  calHL:null, sortAsc:true, settingsOpen:false, tweetEdits:{},
+};
+
+const $=id=>document.getElementById(id);
+const esc=s=>{const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;};
+const SVG={
+  back:'<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+  fwd:'<svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>',
+  search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
+  gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  home:'<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  image:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+  edit:'<svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  undo:'<svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+  folder:'<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+  download:'<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  sort:'<svg viewBox="0 0 24 24"><path d="M7 4v16m0 0l-3-3m3 3l3-3M17 20V4m0 0l3 3m-3-3l-3 3"/></svg>',
+};
+
+function parseArchiveFile(raw){
+  const m=raw.match(/=\s*(\[[\s\S]*\])\s*;?\s*$/);
+  if(!m) throw new Error('JS変数代入の形式が見つかりませんでした。');
+  const prefix=raw.slice(0,m.index+raw.slice(m.index).indexOf(m[1]));
+  return {prefix,data:JSON.parse(m[1])};
+}
+function getField(r){const t=r.tweet||r;return{text:t.full_text||t.text||'',date:t.created_at||null,id:t.id_str||t.id||''};}
+function cleanText(t){return t.replace(/\s*https:\/\/t\.co\/\w+\s*$/g,'').trim();}
+function monthKeyOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
+function loadFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const{prefix,data}=parseArchiveFile(e.target.result);
+      if(!Array.isArray(data)){alert('配列形式が見つかりませんでした。');return;}
+      S.prefix=prefix;S.filename=file.name;
+      const existingIds=new Set(S.entries.filter(e=>!e.isCustom).map(e=>e.id));
+      const tweetEntries=[];
+      data.forEach(raw=>{
+        const f=getField(raw);const text=cleanText(f.text);if(!text)return;
+        const d=f.date?new Date(f.date):null;if(!d||isNaN(d.getTime()))return;
+        if(existingIds.has(f.id))return;
+        tweetEntries.push({raw,text,dateObj:d,id:f.id,editText:text,rewrite:'',status:'pending'});
+      });
+      const customs=loadCustomEntries();
+      const allEntries=[...tweetEntries,...customs];
+      allEntries.sort((a,b)=>a.dateObj-b.dateObj);
+      buildIndex(allEntries);
+      S.moods=loadMoods();S.tweetEdits=loadTweetEdits();
+      // Apply saved tweet edits
+      allEntries.forEach(e=>{if(!e.isCustom&&S.tweetEdits[e.id]){const ed=S.tweetEdits[e.id];e.editText=ed.editText;e.rewrite=ed.rewrite;e.status=ed.status;}});
+      S.tab='diary';S.view='cover';
+      $('dropPanel').classList.add('hidden');
+      $('viewerPanel').classList.remove('hidden');
+      render();
+    }catch(err){alert('読み込みエラー: '+err.message);}
+  };
+  reader.readAsText(file,'utf-8');
+}
+
+function buildIndex(entries){
+  S.entries=entries;
+  const bm={};entries.forEach((e,i)=>{const k=monthKeyOf(e.dateObj);(bm[k]=bm[k]||[]).push(i);});
+  S.byMonth=bm;S.monthKeys=Object.keys(bm).sort();
+  const by={};S.monthKeys.forEach(k=>{const y=k.split('-')[0];(by[y]=by[y]||[]).push(k);});
+  S.byYear=by;S.years=Object.keys(by).sort((a,b)=>b-a);
+}
+
+function fmtTime(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function fmtDateFull(d){return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+'（'+DAYS[d.getDay()]+'）'+fmtTime(d);}
+function highlight(text,term){const e=esc(text);if(!term)return e;const t=term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');return e.replace(new RegExp('('+t+')','gi'),'<mark>$1</mark>');}
+
+// ─── Render ───
+function render(){renderHeader();renderMain();renderNav();updateMediaStat();}
+function renderMain(){
+  const m=$('main');
+  if(S.tab==='diary'){
+    if(S.view==='cover') m.innerHTML=renderMemories()+renderCover();
+    else m.innerHTML=renderMonthView();
+  }else if(S.tab==='search') m.innerHTML=renderSearch();
+  else if(S.tab==='gallery') m.innerHTML=renderGallery();
+  wireAll(m);
+  if(S.tab==='search'){const sb=m.querySelector('.search-input');if(sb){sb.focus();sb.selectionStart=sb.selectionEnd=sb.value.length;}}
+}
+
+function renderHeader(){
+  const h=$('header');
+  if(S.tab==='diary'&&S.view==='month'){
+    const idx=S.monthKeys.indexOf(S.currentMonth);
+    const prev=idx>0?S.monthKeys[idx-1]:null;
+    const next=idx<S.monthKeys.length-1?S.monthKeys[idx+1]:null;
+    const[y,mon]=S.currentMonth.split('-');
+    h.innerHTML=
+      '<button class="h-btn" id="backBtn">'+SVG.back+'</button>'+
+      '<div class="h-group" style="gap:2px">'+
+        '<button class="month-nav'+(prev?'':' disabled')+'" id="prevMonth2">'+SVG.back+'</button>'+
+        '<div class="month-label"><div class="ml-num">'+y+' / '+parseInt(mon,10)+'月</div></div>'+
+        '<button class="month-nav'+(next?'':' disabled')+'" id="nextMonth2">'+SVG.fwd+'</button>'+
+      '</div>'+
+      '<div class="h-group">'+
+        '<button class="h-btn" id="sortBtn" title="並び順">'+SVG.sort+'</button>'+
+        '<button class="h-btn" id="settingsBtn">'+SVG.gear+'</button>'+
+      '</div>';
+    $('backBtn').onclick=()=>{S.view='cover';S.calHL=null;render();$('main').scrollTop=0;};
+    $('sortBtn').onclick=()=>{S.sortAsc=!S.sortAsc;renderMain();};
+    $('settingsBtn').onclick=()=>openSettings();
+    const pm2=$('prevMonth2'),nm2=$('nextMonth2');
+    if(pm2&&prev)pm2.onclick=()=>{S.currentMonth=prev;S.calHL=null;render();$('main').scrollTop=0;};
+    if(nm2&&next)nm2.onclick=()=>{S.currentMonth=next;S.calHL=null;render();$('main').scrollTop=0;};
+  }else{
+    h.innerHTML=
+      '<div class="h-title">twidiary<span>.</span></div>'+
+      '<div class="h-group">'+
+        '<button class="h-btn" id="settingsBtn">'+SVG.gear+'</button>'+
+      '</div>';
+    $('settingsBtn').onclick=()=>openSettings();
+  }
+}
+
+function renderNav(){
+  const n=$('bnav');
+  n.innerHTML=[
+    {id:'diary',icon:SVG.home,label:'日記'},
+    {id:'search',icon:SVG.search,label:'検索'},
+    {id:'gallery',icon:SVG.image,label:'メディア'},
+  ].map(t=>'<button data-tab="'+t.id+'" class="'+(S.tab===t.id?'active':'')+'">'+t.icon+'<span>'+t.label+'</span></button>').join('');
+  n.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    S.tab=b.dataset.tab;if(S.tab==='diary'){S.view='cover';S.calHL=null;}
+    render();$('main').scrollTop=0;
+  });
+}
+
+// ─── Cover ───
+function renderCover(){
+  if(!S.years.length) return '<div class="empty-state">表示できる記録がありません</div>';
+  return S.years.map(y=>{
+    const total=S.byYear[y].reduce((s,k)=>s+S.byMonth[k].length,0);
+    const months=new Set(S.byYear[y].map(k=>parseInt(k.split('-')[1],10)));
+    let tiles='';
+    for(let m=1;m<=12;m++){
+      const key=y+'-'+String(m).padStart(2,'0');
+      const has=months.has(m);const cnt=has?S.byMonth[key].length:0;
+      const dots=has?'<div class="m-dots">'+Array(Math.min(cnt,8)).fill('<div class="m-dot"></div>').join('')+'</div>':'';
+      tiles+='<div class="m-card'+(has?'':' empty')+'" '+(has?'data-key="'+key+'"':'')+'><div class="m-name">'+m+'</div><div class="m-sub">'+(has?cnt+'件':'—')+'</div>'+dots+'</div>';
+    }
+    return '<div class="cover-section"><div class="year-head">'+y+'<span class="cnt">'+total+'件</span></div><div class="month-cards">'+tiles+'</div></div>';
+  }).join('');
+}
+
+// ─── Month View ───
+function renderMonthView(){
+  return renderCalendar(S.currentMonth)+
+    '<div class="cal-divider"></div>'+
+    renderTimeline(S.currentMonth,S.calHL);
+}
+
+function renderCalendar(mk){
+  const[y,m]=mk.split('-').map(Number);
+  const first=new Date(y,m-1,1).getDay();
+  const days=new Date(y,m,0).getDate();
+  const today=new Date();const isThisMonth=today.getFullYear()===y&&today.getMonth()===m-1;
+  const counts={};(S.byMonth[mk]||[]).forEach(i=>{const d=S.entries[i].dateObj.getDate();counts[d]=(counts[d]||0)+1;});
+  let cells='';
+  for(let i=0;i<first;i++) cells+='<div class="cal-cell"></div>';
+  for(let d=1;d<=days;d++){
+    const has=!!counts[d];
+    const isToday=isThisMonth&&today.getDate()===d;
+    const hl=S.calHL===d;
+    cells+='<div class="cal-cell'+(has?' has':'')+(isToday?' today':'')+(hl?' hl':'')+'" '+(has?'data-day="'+d+'"':'')+'><span>'+d+'</span>'+(has?'<div class="cal-dot"></div>':'')+'</div>';
+  }
+  const hdr='<div class="cal-days">'+DAYS.map(d=>'<div>'+d+'</div>').join('')+'</div>';
+  return '<div class="cal-wrap">'+hdr+'<div class="cal-grid">'+cells+'</div></div>';
+}
+
+function renderTimeline(mk,filterDay){
+  const idxs=S.byMonth[mk]||[];
+  if(!idxs.length) return '<div class="empty-state">この月の記録はありません</div>';
+  const byDay={};idxs.forEach(i=>{const d=S.entries[i].dateObj.getDate();(byDay[d]=byDay[d]||[]).push(i);});
+  const sortedDays=Object.keys(byDay).map(Number).sort((a,b)=>S.sortAsc?a-b:b-a);
+  let html='<div class="timeline">';
+  sortedDays.forEach(day=>{
+    if(filterDay&&day!==filterDay) return;
+    const ents=byDay[day];
+    const dn=DAYS[S.entries[ents[0]].dateObj.getDay()];
+    html+='<div class="day-group" id="day-'+day+'"><div class="day-marker"><div class="day-num">'+day+'</div><div class="day-name">'+dn+'</div></div><div class="day-content">';
+    ents.forEach(i=>{html+=renderEntry(i);});
+    html+='</div></div>';
+  });
+  return html+'</div>';
+}
+
+function renderEntry(i,opts){
+  opts=opts||{};const e=S.entries[i];
+  const editing=S.openEdit.has(i);
+  const shownText=e.status==='applied'?e.rewrite:e.text;
+  const media=S.mediaByTweetId[e.id]||[];
+  const mCls=media.length?'m'+Math.min(media.length,4):'';
+  const mediaHtml=media.length?'<div class="e-media '+mCls+'">'+media.map((m,mi)=>
+    m.isVideo?'<div class="e-video-placeholder" data-idx="'+i+'" data-mi="'+mi+'">▶</div>':
+    '<img class="e-img" src="'+esc(m.url)+'" data-idx="'+i+'" data-mi="'+mi+'">'
+  ).join('')+'</div>':'';
+
+  // mood
+  const cur=(S.moods&&S.moods[e.id])||'';
+  const moodHtml='<div class="mood-row">'+MOODS.map(m=>
+    '<button class="mood-btn'+(cur===m.key?' on':'')+'" data-idx="'+i+'" data-mood="'+m.key+'" title="'+m.label+'" style="--mc:'+m.color+'">'+m.mark+'</button>'
+  ).join('')+'</div>';
+
+  let body;
+  if(editing){
+    body='<textarea class="e-edit-area" data-idx="'+i+'">'+esc(e.editText)+'</textarea>'+
+      mediaHtml+
+      '<div class="e-edit-actions">'+
+        '<button class="e-edit-btn secondary cancel-btn" data-idx="'+i+'">キャンセル</button>'+
+        '<button class="e-edit-btn primary apply-btn" data-idx="'+i+'">保存</button>'+
+      '</div>';
+  }else{
+    const statusHtml=e.status==='applied'?'<span class="e-status">書き換え済み</span>':
+      e.status==='deleted'?'<span class="e-status">削除予定 <button class="restore-btn" data-idx="'+i+'">元に戻す</button></span>':'';
+    body='<div class="e-text">'+(opts.term?highlight(shownText,opts.term):esc(shownText))+'</div>'+
+      mediaHtml+
+      '<div class="e-foot">'+moodHtml+
+        '<div class="e-actions">'+
+          '<button class="e-act edit-btn" data-idx="'+i+'" title="編集">'+SVG.edit+'</button>'+
+          (e.status==='deleted'?
+            '<button class="e-act restore-act" data-idx="'+i+'" title="元に戻す">'+SVG.undo+'</button>':
+            '<button class="e-act del delete-btn" data-idx="'+i+'" title="削除">'+SVG.trash+'</button>')+
+        '</div>'+
+      '</div>'+statusHtml;
+  }
+  const timeStr=(opts.fullDate?fmtDateFull(e.dateObj):fmtTime(e.dateObj))+(e.isCustom?'<span class="e-custom-badge">手書き</span>':'');
+  return '<div class="e-card'+(e.status==='deleted'?' deleted':'')+'">'+
+    '<div class="e-time">'+timeStr+'</div>'+body+'</div>';
+}
+
+// ─── Search ───
+function renderSearch(){
+  let html='<div class="search-bar"><input type="text" class="search-input" placeholder="キーワードで探す" value="'+esc(S.searchTerm)+'"></div>';
+  const term=S.searchTerm.trim().toLowerCase();
+  if(!term) return html+'<div class="empty-state">検索キーワードを入力してください</div>';
+  const matches=[];
+  S.entries.forEach((e,i)=>{if(e.text.toLowerCase().includes(term))matches.push(i);});
+  html+='<div class="search-stat">'+matches.length+'件ヒット</div>';
+  if(!matches.length) return html+'<div class="empty-state">「'+esc(S.searchTerm)+'」に一致する記録はありません</div>';
+  // Group by day for timeline display
+  const byDay={};matches.forEach(i=>{
+    const e=S.entries[i];const key=e.dateObj.toISOString().slice(0,10);
+    (byDay[key]=byDay[key]||[]).push(i);
+  });
+  const days=Object.keys(byDay).sort().reverse();
+  html+='<div class="search-results"><div class="timeline">';
+  days.forEach(dk=>{
+    const ents=byDay[dk];const first=S.entries[ents[0]];
+    const d=first.dateObj;
+    html+='<div class="day-group"><div class="day-marker"><div class="day-num" style="font-size:18px">'+d.getDate()+'</div><div class="day-name" style="font-size:10px">'+d.getFullYear()+'/'+(d.getMonth()+1)+'</div></div><div class="day-content">';
+    ents.forEach(i=>{html+=renderEntry(i,{term:S.searchTerm,fullDate:false});});
+    html+='</div></div>';
+  });
+  html+='</div></div>';
+  return html;
+}
+
+// ─── Gallery ───
+function renderGallery(){
+  const items=[];
+  S.entries.forEach((e,i)=>{
+    const media=S.mediaByTweetId[e.id]||[];
+    media.forEach((m,mi)=>{
+      if(!m.isVideo) items.push({url:m.url,date:e.dateObj,idx:i,mi});
+    });
+  });
+  if(!items.length) return '<div class="gallery-empty">画像を読み込むには、設定 ⚙ から画像フォルダを読み込んでください</div>';
+  items.sort((a,b)=>b.date-a.date);
+  let html='<div class="gallery-grid">';
+  items.forEach(it=>{
+    const ds=it.date.getFullYear()+'/'+(it.date.getMonth()+1)+'/'+it.date.getDate();
+    html+='<div class="gallery-item" data-idx="'+it.idx+'" data-mi="'+it.mi+'"><img src="'+esc(it.url)+'" loading="lazy"><div class="g-date">'+ds+'</div></div>';
+  });
+  return html+'</div>';
+}
+
+// ─── Memories (n年前の今日) ───
+function renderMemories(){
+  const today=new Date();const tm=today.getMonth(),td=today.getDate(),ty=today.getFullYear();
+  const mems=S.entries.filter(e=>e.dateObj.getMonth()===tm&&e.dateObj.getDate()===td&&e.dateObj.getFullYear()!==ty);
+  if(!mems.length) return '';
+  const collapsed=localStorage.getItem('journal-mem-collapsed')==='1';
+  const byY={};mems.forEach(e=>{const y=e.dateObj.getFullYear();(byY[y]=byY[y]||[]).push(e);});
+  const years=Object.keys(byY).sort();
+  const oldest=ty-parseInt(years[0],10);
+  let h='<div class="memories"><div class="mem-card"><div class="mem-header"><div class="mem-title">📅 '+oldest+'年前の今日</div><button class="mem-toggle" id="memToggle">'+(collapsed?'▼ 開く':'▲ 閉じる')+'</button></div>';
+  if(!collapsed){
+    Object.keys(byY).sort((a,b)=>b-a).forEach(y=>{
+      const diff=ty-parseInt(y,10);
+      const mk=y+'-'+String(tm+1).padStart(2,'0');
+      byY[y].slice(0,3).forEach((e,ei)=>{
+        const mi=S.entries.indexOf(e);
+        h+='<div class="mem-entry" data-mem-month="'+mk+'" data-mem-day="'+td+'"><div class="mem-year">'+diff+'年前（'+y+'年）<span class="mem-jump">→ この月を見る</span><button class="e-act edit-btn mem-act" data-idx="'+mi+'" title="編集" style="display:inline-flex;width:24px;height:24px;vertical-align:middle;margin-left:4px">'+SVG.edit+'</button><button class="e-act del delete-btn mem-act" data-idx="'+mi+'" title="削除" style="display:inline-flex;width:24px;height:24px;vertical-align:middle">'+SVG.trash+'</button></div>'+(e.status==='deleted'?'<s style="opacity:.4">'+esc(e.text)+'</s>':esc(e.text))+'</div>';
+      });
+    });
+  }
+  return h+'</div></div>';
+}
+
+// ─── Settings ───
+function openSettings(){
+  S.settingsOpen=true;
+  const overlay=document.createElement('div');overlay.className='settings-overlay';overlay.id='settingsOverlay';
+  overlay.innerHTML='<div class="settings-sheet"><div class="handle"></div><h3>設定</h3>'+
+    '<div class="s-row" id="sMedia" style="position:relative">'+SVG.folder+'<div><div class="s-label">画像フォルダを読み込む</div><div class="s-hint" id="mediaHint">'+(S.mediaCount?S.mediaCount+'枚読み込み済み':'tweet_media フォルダを選択')+'</div></div><input type="file" class="media-file-input" id="mediaFileInput" webkitdirectory multiple></div>'+
+    '<div class="s-row" id="sDownload">'+SVG.download+'<div class="s-label">編集後のファイルをダウンロード</div></div>'+
+    '<div class="s-row" id="sExport">'+SVG.download+'<div><div class="s-label">バックアップ（エクスポート）</div><div class="s-hint">手書き日記・気分マークをJSONで保存</div></div></div>'+
+    '<div class="s-row" id="sImport" style="position:relative">'+SVG.folder+'<div><div class="s-label">バックアップから復元</div><div class="s-hint">JSONファイルを読み込み</div></div><input type="file" class="media-file-input" id="importInput" accept=".json"></div>'+
+    '<div class="s-row" id="sAddTweets" style="position:relative">'+SVG.refresh+'<div class="s-label">tweet.js を追加読み込み</div><input type="file" class="media-file-input" id="addTweetsInput" accept=".js"></div>'+
+    '<div class="s-row" id="sReload">'+SVG.refresh+'<div class="s-label">別のファイルで置き換え</div></div>'+
+    '<div class="s-row" id="sReset" style="color:var(--danger)">'+SVG.trash+'<div class="s-label">すべてリセット</div></div>'+
+    '<div class="s-row"><div style="font-size:12px;color:var(--t3)">'+S.entries.length+' 件の記録 / 書き換え: '+S.entries.filter(e=>e.status==='applied').length+'件 / 削除予定: '+S.entries.filter(e=>e.status==='deleted').length+'件</div></div>'+
+  '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();S.settingsOpen=false;}});
+  $('sDownload').onclick=downloadFile;
+  $('sReload').onclick=()=>{overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');$('fileInput').value='';};
+  $('addTweetsInput').addEventListener('change',e=>{if(e.target.files[0]){overlay.remove();S.settingsOpen=false;loadFile(e.target.files[0]);}});
+  $('sExport').onclick=()=>{exportBackup();overlay.remove();S.settingsOpen=false;};
+  $('importInput').addEventListener('change',e=>{if(e.target.files[0])importBackup(e.target.files[0],overlay);});
+  $('sReset').onclick=()=>{if(!confirm('すべてのデータ（手書き日記含む）をリセットしますか？'))return;localStorage.removeItem(CUSTOM_KEY);localStorage.removeItem(MOOD_KEY);S.entries=[];S.mediaByTweetId={};S.mediaCount=0;S.moods={};buildIndex([]);overlay.remove();S.settingsOpen=false;$('viewerPanel').classList.add('hidden');$('dropPanel').classList.remove('hidden');};
+  $('mediaFileInput').addEventListener('change',e=>{
+    const files=Array.from(e.target.files||[]);let matched=0;
+    files.forEach(file=>{
+      const m=file.name.match(/^(\d+)-/);if(!m)return;
+      const tweetId=m[1];const ext=(file.name.split('.').pop()||'').toLowerCase();
+      const isVideo=['mp4','mov','m4v'].includes(ext);
+      const url=URL.createObjectURL(file);
+      (S.mediaByTweetId[tweetId]=S.mediaByTweetId[tweetId]||[]).push({url,name:file.name,isVideo});matched++;
+    });
+    S.mediaCount+=matched;
+    const hint=$('mediaHint');if(hint)hint.textContent=S.mediaCount+'枚読み込み済み';
+    renderMain();
+  });
+}
+
+function downloadFile(){
+  const out=S.entries.filter(e=>e.status!=='deleted'&&!e.isCustom).map(e=>{
+    const raw=JSON.parse(JSON.stringify(e.raw));
+    if(e.status==='applied'){if(raw.tweet)raw.tweet.full_text=e.rewrite;else raw.full_text=e.rewrite;}
+    return raw;
+  });
+  const content=S.prefix+JSON.stringify(out,null,2)+S.suffix;
+  const blob=new Blob([content],{type:'application/javascript'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=S.filename;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function exportBackup(){
+  const data={
+    version:1,
+    exported:new Date().toISOString(),
+    customEntries:JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]'),
+    moods:JSON.parse(localStorage.getItem(MOOD_KEY)||'{}'),
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download='journal-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function importBackup(file,overlay){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data.version){alert('バックアップ形式が正しくありません');return;}
+      // Merge custom entries (deduplicate by id)
+      const existing=JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]');
+      const existingIds=new Set(existing.map(e=>e.id));
+      const newEntries=(data.customEntries||[]).filter(e=>!existingIds.has(e.id));
+      const merged=[...existing,...newEntries];
+      localStorage.setItem(CUSTOM_KEY,JSON.stringify(merged));
+      // Merge moods
+      const curMoods=JSON.parse(localStorage.getItem(MOOD_KEY)||'{}');
+      const importMoods=data.moods||{};
+      Object.assign(curMoods,importMoods);
+      localStorage.setItem(MOOD_KEY,JSON.stringify(curMoods));
+      S.moods=curMoods;
+      // Reload custom entries into state
+      const customs=loadCustomEntries();
+      const tweets=S.entries.filter(e=>!e.isCustom);
+      const all=[...tweets,...customs];
+      all.sort((a,b)=>a.dateObj-b.dateObj);
+      buildIndex(all);
+      if(overlay){overlay.remove();S.settingsOpen=false;}
+      alert('復元しました（'+newEntries.length+'件の日記を追加）');
+      render();
+    }catch(err){alert('読み込みエラー: '+err.message);}
+  };
+  reader.readAsText(file,'utf-8');
+}
+
+function updateMediaStat(){}
+
+// ─── Wire Events ───
+function wireAll(container){
+  // Month tiles (cover)
+  container.querySelectorAll('.m-card[data-key]').forEach(tile=>{
+    tile.onclick=()=>{S.currentMonth=tile.dataset.key;S.view='month';S.calHL=null;render();$('main').scrollTop=0;};
+  });
+  // Calendar cells
+  container.querySelectorAll('.cal-cell.has').forEach(cell=>{
+    cell.onclick=()=>{
+      const day=parseInt(cell.dataset.day,10);
+      S.calHL=S.calHL===day?null:day;renderMain();
+      if(S.calHL){const el=$('main').querySelector('#day-'+day);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
+    };
+  });
+  // Memories toggle
+  const memTgl=container.querySelector('#memToggle');
+  if(memTgl)memTgl.onclick=()=>{const c=localStorage.getItem('journal-mem-collapsed')==='1';localStorage.setItem('journal-mem-collapsed',c?'0':'1');renderMain();};
+  container.querySelectorAll('.mem-entry[data-mem-month]').forEach(el=>{
+    el.onclick=ev=>{
+      if(ev.target.closest('.mem-act'))return;
+      S.currentMonth=el.dataset.memMonth;S.calHL=parseInt(el.dataset.memDay,10);S.view='month';render();$('main').scrollTop=0;
+    };
+  });
+  // Memories edit/delete
+  container.querySelectorAll('.mem-act.edit-btn').forEach(b=>b.onclick=ev=>{ev.stopPropagation();const idx=parseInt(b.dataset.idx,10);const e=S.entries[idx];S.currentMonth=monthKeyOf(e.dateObj);S.calHL=e.dateObj.getDate();S.view='month';S.openEdit.add(idx);render();$('main').scrollTop=0;});
+  container.querySelectorAll('.mem-act.delete-btn').forEach(b=>b.onclick=ev=>{ev.stopPropagation();const idx=parseInt(b.dataset.idx,10);const ent=S.entries[idx];if(ent.isCustom){S.entries.splice(idx,1);saveCustomEntries();buildIndex(S.entries);}else{ent.status='deleted';S.tweetEdits[ent.id]={editText:ent.editText,rewrite:ent.rewrite,status:'deleted'};saveTweetEdits();}renderMain();});
+  // (Month nav is in header now)
+  // Entry actions
+  container.querySelectorAll('.edit-btn:not(.mem-act)').forEach(b=>b.onclick=()=>{S.openEdit.add(parseInt(b.dataset.idx,10));renderMain();});
+  container.querySelectorAll('.cancel-btn').forEach(b=>b.onclick=()=>{S.openEdit.delete(parseInt(b.dataset.idx,10));renderMain();});
+  container.querySelectorAll('.apply-btn').forEach(b=>b.onclick=()=>{
+    const idx=parseInt(b.dataset.idx,10);
+    const ta=container.querySelector('textarea[data-idx="'+idx+'"]');
+    const ent=S.entries[idx];
+    ent.editText=ta.value;ent.rewrite=ta.value;ent.status='applied';
+    if(ent.isCustom){ent.text=ta.value;ent.status='pending';saveCustomEntries();}
+    else{S.tweetEdits[ent.id]={editText:ent.editText,rewrite:ent.rewrite,status:ent.status};saveTweetEdits();}
+    S.openEdit.delete(idx);renderMain();
+  });
+  container.querySelectorAll('.delete-btn:not(.mem-act)').forEach(b=>b.onclick=()=>{
+    const idx=parseInt(b.dataset.idx,10);const ent=S.entries[idx];
+    if(ent.isCustom){S.entries.splice(idx,1);saveCustomEntries();buildIndex(S.entries);renderMain();}
+    else{ent.status='deleted';S.tweetEdits[ent.id]={editText:ent.editText,rewrite:ent.rewrite,status:'deleted'};saveTweetEdits();renderMain();}
+  });
+  container.querySelectorAll('.restore-btn,.restore-act').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();const ri=parseInt(b.dataset.idx,10);const re=S.entries[ri];re.status='pending';if(!re.isCustom){delete S.tweetEdits[re.id];saveTweetEdits();}renderMain();
+  });
+  container.querySelectorAll('.e-edit-area').forEach(ta=>{
+    ta.oninput=()=>{S.entries[parseInt(ta.dataset.idx,10)].editText=ta.value;};
+  });
+  // Mood
+  container.querySelectorAll('.mood-btn').forEach(b=>b.onclick=()=>{
+    const idx=parseInt(b.dataset.idx,10),mood=b.dataset.mood,id=S.entries[idx].id;
+    if(S.moods[id]===mood)delete S.moods[id];else S.moods[id]=mood;
+    saveMoods();renderMain();
+  });
+  // Media clicks (entry images → lightbox)
+  container.querySelectorAll('.e-img,.e-video-placeholder').forEach(el=>{
+    el.onclick=()=>{
+      const idx=parseInt(el.dataset.idx,10),mi=parseInt(el.dataset.mi,10);
+      const m=(S.mediaByTweetId[S.entries[idx].id]||[])[mi];
+      if(m) openLightbox(m);
+    };
+  });
+  // Gallery items → jump to that day's diary
+  container.querySelectorAll('.gallery-item').forEach(el=>{
+    el.onclick=()=>{
+      const idx=parseInt(el.dataset.idx,10);
+      const e=S.entries[idx];
+      S.currentMonth=monthKeyOf(e.dateObj);S.calHL=e.dateObj.getDate();
+      S.tab='diary';S.view='month';render();$('main').scrollTop=0;
+      setTimeout(()=>{const d=$('main').querySelector('#day-'+e.dateObj.getDate());if(d){d.scrollIntoView({behavior:'smooth',block:'start'});}},150);
+    };
+  });
+  // Search
+  const si=container.querySelector('.search-input');
+  if(si) si.oninput=e=>{S.searchTerm=e.target.value;renderMain();};
+}
+
+// ─── Lightbox ───
+function openLightbox(m){
+  const lb=$('lightbox');const c=$('lbContent');
+  c.innerHTML=m.isVideo?'<video src="'+esc(m.url)+'" controls autoplay></video>':'<img src="'+esc(m.url)+'">';
+  lb.classList.remove('hidden');
+}
+$('lightbox').onclick=()=>{$('lightbox').classList.add('hidden');$('lbContent').innerHTML='';};
+
+// ─── File Input ───
+$('fileInput').addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0]);});
+const dz=$('dropzone');
+dz.onclick=()=>$('fileInput').click();
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);});
+
+// ─── Init: auto-load custom entries ───
+$('fabBtn').onclick=openCompose;
+$('skipBtn').onclick=()=>{
+  const customs=loadCustomEntries();
+  buildIndex(customs);S.moods=loadMoods();S.tweetEdits=loadTweetEdits();
+  S.tab='diary';S.view='cover';
+  $('dropPanel').classList.add('hidden');$('viewerPanel').classList.remove('hidden');
+  render();
+};
+(function(){
+  const customs=loadCustomEntries();
+  if(customs.length){
+    buildIndex(customs);S.moods=loadMoods();S.tweetEdits=loadTweetEdits();
+    S.tab='diary';S.view='cover';
+    $('dropPanel').classList.add('hidden');$('viewerPanel').classList.remove('hidden');
+    render();
+  }
+})();
+
+// Touch swipe for month nav
+let touchStartX=0;
+$('app').addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;},{passive:true});
+$('app').addEventListener('touchend',e=>{
+  if(S.view!=='month')return;
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  if(Math.abs(dx)<80)return;
+  const idx=S.monthKeys.indexOf(S.currentMonth);
+  if(dx>0&&idx>0){S.currentMonth=S.monthKeys[idx-1];S.calHL=null;render();$('main').scrollTop=0;}
+  if(dx<0&&idx<S.monthKeys.length-1){S.currentMonth=S.monthKeys[idx+1];S.calHL=null;render();$('main').scrollTop=0;}
+},{passive:true});
+})();
+</script>
+</body>
+</html>
